@@ -82,15 +82,35 @@ function fitNav() {
   S.follow = false;
   map.fitBounds(pts, { paddingTopLeft: [40, 80], paddingBottomRight: [40, sheetH() + 40], maxZoom: 16 });
 }
+// Following a friend: the target moves, so re-plan the interception every few seconds.
+function updateFriendNav() {
+  const f = S.friends.get(S.nav.friendId);
+  if (!f) { navRoute = { error: 'Ta osoba zniknęła z mapy (ukryła się albo straciła zasięg).' }; return; }
+  S.nav.lat = f.pos[0]; S.nav.lon = f.pos[1]; S.nav.label = f.name;
+  if (!S.myPos || !S.net) { navRoute = null; return; }
+  const dist = haversine([S.myPos[0], S.myPos[1]], [f.pos[0], f.pos[1]]);
+  if (dist < 60) { navRoute = { here: true, dist, friend: f }; }
+  else {
+    const plan = planMeet(S.net, { pos: S.myPos, track: S.myTrack }, S.preds.get(f.id));
+    if (plan && !plan.error) navRoute = { ...plan, dist, friend: f };
+    else { const r = routeToPoint(S.net, { pos: S.myPos, track: S.myTrack }, f.pos[0], f.pos[1]); navRoute = r ? { ...r, dist, friend: f, direct: true } : null; }
+  }
+  if (navRoute?.here && arrivedFor !== S.nav) { arrivedFor = S.nav; notify(`Jesteś przy: ${f.name}`, 'Dojechałeś do znajomego'); }
+  if (navRoute?.node && !navRoute.direct) navLayer.addLayer(L.marker([navRoute.node.lat, navRoute.node.lon], { icon: L.divIcon({ className: '', html: '<div class="meet"></div>', iconSize: [30, 30] }), interactive: false, zIndexOffset: 800 }));
+}
 function updateNav(force) {
   if (!S.nav || (!force && Date.now() - navAt < 5000)) return;
   navAt = Date.now();
   navLayer.clearLayers();
+  if (S.nav.friendId) { updateFriendNav(); drawNavLine(); return; }
   navLayer.addLayer(L.marker([S.nav.lat, S.nav.lon], { icon: L.divIcon({ className: '', html: `<div class="flag"><span>${S.nav.at ? hhmm(S.nav.at) : 'cel'}</span></div>`, iconSize: [12, 40], iconAnchor: [2, 40] }), interactive: false, zIndexOffset: 850 }));
   if (!S.myPos || !S.net) { navRoute = null; return; }
   navRoute = routeToPoint(S.net, { pos: S.myPos, track: S.myTrack }, S.nav.lat, S.nav.lon);
   if (navRoute?.here && arrivedFor !== S.nav) { arrivedFor = S.nav; notify('Jesteś na miejscu', S.nav.label); }
-  if (navRoute?.line) {
+  drawNavLine();
+}
+function drawNavLine() {
+  if (navRoute?.line && !navRoute.here) {
     navLayer.addLayer(L.polyline(navRoute.line, { renderer, color: '#fff', weight: 10, opacity: 0.9, interactive: false }));
     navLayer.addLayer(L.polyline(navRoute.line, { renderer, color: '#ff6b00', weight: 6, opacity: 1, interactive: false }));
   }
@@ -103,6 +123,7 @@ function stepsHtml(steps) {
 function navCard() {
   if (!S.nav) return '';
   const r = navRoute, n = S.nav;
+  if (n.friendId) return friendNavCard(r, n);
   let body;
   if (!S.myPos) body = '<p class="small">Czekam na Twoją pozycję GPS…</p>';
   else if (!r) body = '<p class="small">Liczę drogę…</p>';
@@ -116,6 +137,35 @@ function navCard() {
   }
   return `<div class="card nav"><div class="card-h"><b>Prowadzę do: ${esc(n.label)}</b><button class="close" data-act="navstop" aria-label="Zakończ prowadzenie">×</button></div>${body}
     <div class="actions"><button class="btn sm" data-act="navfit">Pokaż na mapie</button></div></div>`;
+}
+function friendNavCard(r, n) {
+  const f = S.friends.get(n.friendId), name = esc(n.label);
+  let body;
+  if (!S.myPos) body = '<p class="small">Czekam na Twoją pozycję GPS…</p>';
+  else if (!r) body = '<p class="small">Liczę drogę…</p>';
+  else if (r.error) body = `<p class="small">${esc(r.error)}</p>`;
+  else if (r.here) body = `<div class="big">Jesteś przy: ${name}</div>`;
+  else {
+    const where = r.node && !r.direct ? nodeLabel(r.node) : '';
+    const head = r.direct ? `Dojazd ${fmtMin(r.myT)}`
+      : r.inTime ? (r.friendT < 30 ? `${name} stoi · dojedziesz za ${fmtMin(r.myT)}` : `Spotkanie${where ? ' przy: ' + esc(where) : ''} za ${fmtMin(r.meetT)}`)
+      : `Spóźnisz się ok. ${fmtMin(r.lateBy)}${where ? ' · miejsce: ' + esc(where) : ''}`;
+    const sub = (r.via ? `Jeśli pojedzie: <b>${esc(wayLabel(r.via))}</b> · ` : '') + `Teraz ${fmtDist(r.dist)} od Ciebie · ${esc(S.preds.get(n.friendId)?.text || '')}`;
+    const late = !r.direct && !r.inTime ? `<div class="actions"><button class="btn sm primary" data-act="qmsend" data-x="${name}, poczekaj na mnie!">Poproś, żeby poczekał(a)</button></div>` : '';
+    body = `<div class="big">${head}</div><div class="small">${sub}</div><ol class="steps">${stepsHtml(r.steps || [])}</ol>${late}`;
+  }
+  return `<div class="card nav"><div class="card-h"><span style="display:flex;align-items:center;gap:8px">${f ? `<span class="dotc" style="background:${f.color}"></span>` : ''}<b>Prowadzę do: ${name}</b></span><button class="close" data-act="navstop" aria-label="Zakończ prowadzenie">×</button></div>${body}
+    <div class="actions"><button class="btn sm" data-act="navfit">Pokaż na mapie</button><span class="small">Trasa odświeża się, gdy ${name} się przemieszcza.</span></div></div>`;
+}
+function startFriendNav(id) { const f = S.friends.get(id); if (f) startNav({ friendId: id, label: f.name, lat: f.pos[0], lon: f.pos[1] }); }
+let pickOpen = false;
+HOOK.act.navpick = () => { pickOpen = !pickOpen; tick(true); };
+HOOK.act.navfriend = el => { pickOpen = false; startFriendNav(el.dataset.id); };
+function pickCard() {
+  if (!pickOpen) return '';
+  const fr = visibleFriends().filter(f => f.id !== S.nav?.friendId).sort((a, b) => (distTo(a) ?? 1e9) - (distTo(b) ?? 1e9));
+  if (!fr.length) return '<div class="card"><p class="small">Nikogo jeszcze nie widać na mapie.</p></div>';
+  return `<div class="card"><div class="card-h"><b>Do kogo jechać?</b></div><div class="picks">${fr.map(f => { const d = distTo(f); return `<button class="pick" data-act="navfriend" data-id="${esc(f.id)}"><span class="av sm" style="background:${f.color};color:${f.color}"><span style="color:#fff">${esc(initials(f.name))}</span></span><span class="pn"><b>${esc(f.name)}</b><span>${esc(S.preds.get(f.id)?.text || '')}</span></span><span class="pd">${d != null ? fmtDist(d) : ''}</span></button>`; }).join('')}</div></div>`;
 }
 HOOK.act.navstop = stopNav;
 HOOK.act.navfit = fitNav;
@@ -249,7 +299,7 @@ HOOK.act.sos = () => { sosConfirm = true; tick(true); };
 HOOK.act.sosyes = () => setSos(true);
 HOOK.act.sosno = () => { sosConfirm = false; tick(true); };
 HOOK.act.sosoff = () => setSos(false);
-HOOK.act.sosgo = el => { const f = S.friends.get(el.dataset.id); if (f) startNav({ lat: f.pos[0], lon: f.pos[1], label: `${f.name} (SOS)` }); };
+HOOK.act.sosgo = el => startFriendNav(el.dataset.id);
 function sosCards() {
   let h = '';
   if (S.sos) h += `<div class="card sos"><div class="card-h"><b>Wysłano SOS</b><span class="small">od ${hhmm(S.sos)}</span></div><p>Ekipa widzi Twoją pozycję i dostała alarm. Jeśli to poważne, dzwoń pod <b class="num">112</b>.</p><div class="actions"><button class="btn sm" data-act="sosoff">Odwołaj SOS</button></div></div>`;
@@ -309,8 +359,8 @@ HOOK.friend.push(f => {
 /* ---------- cards above the list ---------- */
 HOOK.top.unshift(() => {
   const hidden = (S.me?.hideUntil || 0) > Date.now();
-  const bar = `<div class="actbar"><button class="btn sm sosbtn" data-act="sos">SOS</button><button class="btn sm" data-act="qm">Wiadomość</button>${hidden ? `<button class="btn sm" data-act="unhide">Pokaż mnie</button>` : ''}<span class="small hint">Przytrzymaj mapę, żeby zaproponować spotkanie</span></div>`;
-  return sosCards() + navCard() + meetCards() + bar + quickCard();
+  const bar = `<div class="actbar"><button class="btn sm sosbtn" data-act="sos">SOS</button><button class="btn sm primary" data-act="navpick">Prowadź do…</button><button class="btn sm" data-act="qm">Wiadomość</button>${hidden ? `<button class="btn sm" data-act="unhide">Pokaż mnie</button>` : ''}<span class="small hint">Przytrzymaj mapę, żeby zaproponować spotkanie</span></div>`;
+  return sosCards() + navCard() + meetCards() + bar + pickCard() + quickCard();
 });
 
 HOOK.netReady.push(askNotifications);

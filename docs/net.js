@@ -428,7 +428,7 @@ function pushWayCand(net, res, w, idx, t0, maxLen = 2500) {
   for (let k = idx + 1; k < w.pts.length; k++) {
     const d = w.cum[k] - w.cum[idx]; if (d > maxLen && w.kind !== 'lift') break;
     if (w.kind === 'lift' && k < w.pts.length - 1) continue;
-    res.cand.push({ node: w.pts[k], t: t0 + d / w.speed + (w.kind === 'lift' ? LIFT_QUEUE * 0.5 : 0), slack: k === w.pts.length - 1 ? 60 : 0, opt: true });
+    res.cand.push({ node: w.pts[k], t: t0 + d / w.speed + (w.kind === 'lift' ? LIFT_QUEUE * 0.5 : 0), slack: k === w.pts.length - 1 ? 60 : 0, opt: true, via: w });
   }
 }
 function addOptions(net, res, endNode, curWi, eta, onlyWay) {
@@ -496,18 +496,22 @@ function planMeet(net, me, pred) {
   const sources = startSources(net, me);
   if (!sources.length) return { error: 'Jesteś poza siecią tras – podejdź bliżej stoku lub wyciągu.' };
   const { dist, prev } = net.dijkstra(sources);
+  // Places on the friend's current piste/lift are certain; places past a fork only possible,
+  // so they must be clearly better (90 s) to win. With one way out, the fork is not a guess.
+  const ways = new Set(pred.cand.filter(c => c.via).map(c => c.via.wi));
+  const guess = c => (c.opt && ways.size > 1 ? 90 : 0);
   let best = null, late = null;
   for (const c of pred.cand) {
     const myT = dist.get(c.node.id); if (myT == null) continue;
     const slack = c.hold ? Infinity : (c.slack || 30);
-    const meetT = Math.max(myT, c.t);
-    if (myT <= c.t + slack) { if (!best || meetT < best.meetT || (meetT === best.meetT && myT < best.myT)) best = { c, myT, meetT }; }
+    const meetT = Math.max(myT, c.t), score = meetT + guess(c);
+    if (myT <= c.t + slack) { if (!best || score < best.score || (score === best.score && myT < best.myT)) best = { c, myT, meetT, score }; }
     else { const l = myT - c.t; if (!late || l < late.lateBy) late = { c, myT, meetT: myT, lateBy: l }; }
   }
   const pick = best || late;
   if (!pick) return { error: 'Nie znalazłem drogi po trasach do tego miejsca.' };
   const { line, steps } = buildRoute(net, me, prev, pick.c.node);
-  return { node: pick.c.node, myT: pick.myT, friendT: pick.c.t, meetT: pick.meetT, inTime: !!best, lateBy: best ? 0 : pick.lateBy, steps, line };
+  return { node: pick.c.node, myT: pick.myT, friendT: pick.c.t, meetT: pick.meetT, inTime: !!best, lateBy: best ? 0 : pick.lateBy, steps, line, via: pick.c.opt && ways.size > 1 ? pick.c.via : null };
 }
 
 /* Route from a person to a fixed point (meeting place, hut). The last bit off the network is walked. */

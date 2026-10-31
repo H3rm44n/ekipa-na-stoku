@@ -202,6 +202,13 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 .flag span{position:absolute;left:3px;top:0;background:#7c3aed;color:#fff;font:700 12px/1 'Barlow Condensed',sans-serif;padding:4px 6px;border-radius:0 6px 6px 0;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35)}
 .ekpop .leaflet-popup-content{min-width:190px}
 .popact{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.picks{display:flex;flex-direction:column;gap:4px}
+.pick{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;width:100%}
+.pick:hover{border-color:var(--accent)}
+.av.sm{width:32px;height:32px;font-size:13px;border-width:2px}
+.pn{min-width:0;display:flex;flex-direction:column}
+.pn span{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd{font:700 16px/1 var(--display);font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){.fm .pulse{animation:none;display:none}}
 </style>
 </head>

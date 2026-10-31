@@ -607,7 +607,7 @@ function detailHtml(f) {
     <div class="box"><h3>Gdzie jest i dokąd jedzie</h3><div class="big" style="font-size:18px">${esc(p.text || '–')}</div>
       ${opts ? `<div class="small" style="margin-top:8px">Potem może pojechać:</div><div class="opts">${opts}</div>` : ''}</div>
     <div class="box"><h3>Droga do: ${esc(f.name)}</h3>${planHtml}</div>
-    <div class="actions"><button class="btn dark" data-act="center">Pokaż na mapie</button><button class="btn" data-act="back">Wszyscy</button></div>
+    <div class="actions"><button class="btn primary" data-act="navfriend" data-id="${esc(f.id)}">Prowadź do: ${esc(f.name)}</button><button class="btn dark" data-act="center">Pokaż na mapie</button><button class="btn" data-act="back">Wszyscy</button></div>
   </div>`;
 }
 function nodeLabel(n) {
