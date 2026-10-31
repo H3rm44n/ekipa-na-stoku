@@ -1,0 +1,9 @@
+{
+  "appId": "pl.hermanski.ekipanastoku",
+  "appName": "Ekipa",
+  "webDir": "docs",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0f2a44"
+  }
+}

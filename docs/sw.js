@@ -1,7 +1,7 @@
 // Offline shell + map tiles you have already seen (useful where the slope has weak signal).
-const SHELL = 'ekipa-shell-v1', TILES = 'ekipa-tiles-v1', MAX_TILES = 2500;
+const SHELL = 'ekipa-shell-v2', TILES = 'ekipa-tiles-v1', MAX_TILES = 2500;
 const ASSETS = ['./', 'index.html', 'app.js', 'net.js', 'manifest.webmanifest', 'icon.svg',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js'];
+  'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/mqtt.min.js', 'vendor/capacitor.js'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(ASSETS)).catch(() => {})); self.skipWaiting(); });
 self.addEventListener('activate', e => {

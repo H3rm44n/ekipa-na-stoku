@@ -178,9 +178,13 @@ function clearMine() { if (G && S.me) for (const c of conns) if (c.connected) c.
 setInterval(() => publish(true), 30000);
 
 /* ---------- GPS ---------- */
-let watchId = null;
+// In the iPhone app GPS comes from a native plugin that keeps reporting with the screen locked.
+const NATIVE = !!window.Capacitor?.isNativePlatform?.();
+const BgGeo = NATIVE ? window.Capacitor.registerPlugin('BackgroundGeolocation') : null;
+let watchId = null, nativeWatch = null;
 function startGps() {
   if (S.me?.demo) return;
+  if (NATIVE) { startNativeGps(); return; }
   if (!('geolocation' in navigator)) { S.gpsError = 'Ten telefon nie udostępnia GPS przeglądarce.'; showBanner(S.gpsError); return; }
   if (watchId != null) return;
   showBanner('Czekam na sygnał GPS… zezwól na lokalizację.');
@@ -193,7 +197,32 @@ function startGps() {
     if (!S.myPos || err.code === 1) showBanner(S.gpsError);
   }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 30000 });
 }
-function stopGps() { if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; } }
+function stopGps() {
+  if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (nativeWatch != null) { BgGeo.removeWatcher({ id: nativeWatch }).catch(() => {}); nativeWatch = null; }
+}
+async function startNativeGps() {
+  if (nativeWatch != null) return;
+  showBanner('Czekam na sygnał GPS… zezwól na lokalizację.');
+  try {
+    nativeWatch = await BgGeo.addWatcher({
+      backgroundMessage: 'Znajomi widzą, gdzie jesteś na stoku.',
+      backgroundTitle: 'Ekipa udostępnia lokalizację',
+      requestPermissions: true, stale: false, distanceFilter: 5,
+    }, (loc, err) => {
+      if (err) {
+        if (err.code === 'NOT_AUTHORIZED') {
+          S.gpsError = 'Brak zgody na lokalizację. Włącz ją w Ustawieniach iPhone’a → Ekipa → Lokalizacja (najlepiej „Zawsze”).';
+          showBanner(S.gpsError, 'Ustawienia', () => BgGeo.openSettings());
+        } else if (!S.myPos) { S.gpsError = 'Nie mogę ustalić pozycji (słaby sygnał GPS).'; showBanner(S.gpsError); }
+        return;
+      }
+      if (!loc) return;
+      S.gpsError = null;
+      setMyPos([loc.latitude, loc.longitude, loc.altitude, loc.accuracy, loc.speed, loc.bearing]);
+    });
+  } catch { S.gpsError = 'Nie udało się uruchomić GPS.'; showBanner(S.gpsError); }
+}
 
 function setMyPos(p, manual) {
   const first = !S.myPos;
@@ -468,7 +497,7 @@ function openSetup() {
   $('#inGroup').value = fromLink || genCode();
   $('#btnGen').onclick = () => { $('#inGroup').value = genCode(); };
   $('#setup').hidden = false;
-  setTimeout(() => $('#inName').focus(), 50);
+  if (!NATIVE) setTimeout(() => $('#inName').focus(), 50);
   $('#setupForm').onsubmit = async e => {
     e.preventDefault();
     const name = $('#inName').value.trim(), group = $('#inGroup').value.trim().toLowerCase();
@@ -500,8 +529,10 @@ function openSettings() {
 }
 $('#btnSettings').onclick = openSettings;
 $('#settings').addEventListener('click', e => { if (e.target.id === 'settings' || e.target.closest('[data-close]')) $('#settings').hidden = true; });
+const WEB_URL = 'https://h3rm44n.github.io/ekipa-na-stoku/';
 $('#btnCopy').onclick = async () => {
-  const txt = `Ekipa na Stoku – kod grupy: ${S.me.group}\n${location.origin}${location.pathname}#g-${S.me.group}`;
+  const txt = `Ekipa na Stoku – kod grupy: ${S.me.group}\n${WEB_URL}#g-${S.me.group}`;
+  if (navigator.share) { try { await navigator.share({ text: txt }); return; } catch (e) { if (e?.name === 'AbortError') return; } }
   try { await navigator.clipboard.writeText(txt); toast('Skopiowano link z kodem'); }
   catch { const r = document.createRange(); r.selectNodeContents($('#stGroup')); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Zaznaczono kod – skopiuj go'); }
 };
@@ -535,8 +566,9 @@ async function start() {
 }
 
 /* ---------- boot ---------- */
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
-if (!window.isSecureContext) showBanner('Otwórz aplikację przez https://, inaczej telefon nie udostępni GPS.');
+if (!NATIVE && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+if (NATIVE) { document.documentElement.classList.add('native'); $('#stWake').closest('label').hidden = true; $('#btnCopy').textContent = 'Udostępnij'; }
+if (!NATIVE && !window.isSecureContext) showBanner('Otwórz aplikację przez https://, inaczej telefon nie udostępni GPS.');
 if (S.me && S.me.group) {
   const fromLink = (location.hash.match(/^#g-([a-z0-9-]{3,40})$/) || [])[1];
   if (fromLink && fromLink !== S.me.group) { S.me.group = fromLink; saveMe(); toast('Dołączono do grupy ' + fromLink); }
