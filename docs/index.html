@@ -151,6 +151,57 @@ input:focus,button:focus-visible{outline:3px solid color-mix(in srgb,var(--accen
 .meet{width:30px;height:30px;border-radius:8px;background:#ff6b00;border:3px solid #fff;transform:rotate(45deg);box-shadow:0 2px 8px rgba(0,0,0,.4)}
 .toast{position:fixed;left:50%;bottom:calc(var(--sheet-h,140px) + var(--sab) + 20px);transform:translateX(-50%);z-index:3000;background:var(--ink);color:var(--snow);padding:10px 16px;border-radius:12px;font-weight:600;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
 .leaflet-popup-content{font:14px/1.35 var(--body);margin:10px 12px}
+
+/* tabs + me line */
+.tabs{display:flex;gap:6px;margin:2px 0 8px}
+.tabs button{flex:1;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--snow);font:700 15px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);display:flex;align-items:center;justify-content:center;gap:6px}
+.tabs button.on{background:var(--ink);color:var(--snow);border-color:var(--ink)}
+.tabs .count{background:var(--card);color:var(--ink);border-radius:9px;padding:1px 7px;font-size:12px}
+.sheet h2.me-line{font:600 13px/1.3 var(--body);letter-spacing:0;text-transform:none;color:var(--ink-2);margin:0 0 6px}
+/* cards in the list */
+.card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--snow);display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-h b{font:700 16px/1.1 var(--display);letter-spacing:.03em;text-transform:uppercase}
+.card .close{width:30px;height:30px;font-size:16px}
+.card p{margin:0;font-size:14px}
+.card.nav{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.card.meet{border-color:#7c3aed55}
+.card.sos{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--card))}
+.card.sos .card-h b{color:var(--bad)}
+.num{font-size:18px;user-select:all}
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.nums b{display:block;font:700 22px/1 var(--display);font-variant-numeric:tabular-nums}
+.nums span{font-size:11px;color:var(--ink-2)}
+.btn.sm{height:34px;padding:0 12px;font-size:13px;border-radius:10px}
+.btn.danger{color:var(--bad)}
+.btn.sosbtn{background:var(--bad);border-color:var(--bad);color:#fff;font-weight:700}
+.actbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:2px 0 8px}
+.actbar .hint{flex:1;min-width:140px;text-align:right}
+.whos{display:flex;flex-wrap:wrap;gap:6px}
+.who{font-size:12px;padding:3px 8px;border-radius:10px;border:1px solid var(--line);background:var(--card)}
+.who.yes{border-color:var(--c);box-shadow:inset 3px 0 0 var(--c)}
+.who.no{opacity:.6;text-decoration:line-through}
+.msgs{gap:4px}
+.qmrow{font-size:13px}
+.dotc{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
+/* ranking */
+.leads{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;margin-bottom:8px}
+.lead{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--snow)}
+.lead span{display:block;font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em}
+.lead b{font:700 18px/1.1 var(--display)}
+.tablewrap{overflow-x:auto}
+table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.rank th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);padding:6px 4px;border-bottom:1px solid var(--line)}
+.rank td{padding:8px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+.rank tr.me td{font-weight:700}
+/* map pieces */
+.poi{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:#fff;font:700 12px/1 'Barlow Condensed',sans-serif;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);background:#8a5a2b}
+.poi.bar{background:#b4236b}.poi.cafe{background:#6b4f3a}.poi.food{background:#c2410c}
+.flag{position:relative;width:12px;height:40px}
+.flag::before{content:"";position:absolute;left:0;top:0;width:3px;height:40px;background:#22313f;border-radius:2px}
+.flag span{position:absolute;left:3px;top:0;background:#7c3aed;color:#fff;font:700 12px/1 'Barlow Condensed',sans-serif;padding:4px 6px;border-radius:0 6px 6px 0;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.ekpop .leaflet-popup-content{min-width:190px}
+.popact{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 @media (prefers-reduced-motion:reduce){.fm .pulse{animation:none;display:none}}
 </style>
 </head>
@@ -212,6 +263,7 @@ input:focus,button:focus-visible{outline:3px solid color-mix(in srgb,var(--accen
     <div class="box"><h3>Bateria i GPS</h3><p class="small" id="stBatt">–</p></div>
     <label class="toggle" for="stEco">Tryb oszczędny (rzadszy GPS przy zjazdach)<input type="checkbox" id="stEco"></label>
     <label class="toggle" for="stWake">Nie wygaszaj ekranu (lepsze śledzenie)<input type="checkbox" id="stWake"></label>
+    <div class="box"><h3>Ukryj mnie na chwilę</h3><div class="opts"><button class="btn sm" data-hide="30">30 min</button><button class="btn sm" data-hide="60">1 h</button><button class="btn sm" data-hide="120">2 h</button></div><p class="note" style="margin-top:6px">Znikniesz z mapy znajomych, a potem pojawisz się sam. SOS zawsze pokazuje Twoją pozycję.</p></div>
     <label class="toggle" for="stShare">Udostępniaj moją pozycję<input type="checkbox" id="stShare"></label>
     <label class="toggle" for="stDemo">Tryb demo (symulowani znajomi)<input type="checkbox" id="stDemo"></label>
     <div class="hr"></div>
@@ -222,6 +274,17 @@ input:focus,button:focus-visible{outline:3px solid color-mix(in srgb,var(--accen
   </div>
 </div>
 
+<div class="modal" id="meet" hidden>
+  <form class="panel" id="meetForm">
+    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase">Spotkanie</b><span>Ekipa dostanie zaproszenie i trasę dojazdu</span></div><button type="button" class="close" data-close aria-label="Zamknij">×</button></div>
+    <label for="mfPlace">Miejsce<input type="text" id="mfPlace" maxlength="60" placeholder="np. Rifugio Graffer"></label>
+    <label for="mfTime">Godzina<input type="time" id="mfTime" step="300"></label>
+    <div class="opts"><button type="button" class="btn sm" data-plus="15">za 15 min</button><button type="button" class="btn sm" data-plus="30">za 30 min</button><button type="button" class="btn sm" data-plus="60">za 1 h</button><button type="button" class="btn sm" data-plus="90">za 1,5 h</button></div>
+    <label for="mfNote">Notatka <span class="opt">(nieobowiązkowa)</span><input type="text" id="mfNote" maxlength="100" placeholder="np. obiad, bierzemy stolik na tarasie"></label>
+    <button class="btn primary" type="submit">Wyślij do ekipy</button>
+  </form>
+</div>
+
 <div class="toast" id="toast" hidden></div>
 
 <script src="vendor/leaflet.js"></script>
@@ -229,5 +292,7 @@ input:focus,button:focus-visible{outline:3px solid color-mix(in srgb,var(--accen
 <script src="vendor/capacitor.js"></script>
 <script src="net.js"></script>
 <script src="app.js"></script>
+<script src="stats.js"></script>
+<script src="social.js"></script>
 </body>
 </html>

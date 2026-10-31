@@ -343,7 +343,8 @@ function predict(net, f, now = Date.now()) {
   const offNet = net.distToNet(pos[0], pos[1], 200) > 150;
   if (offNet || ((f.act === 'pre' || f.act === 'done') && !moving)) {
     res.state = f.act === 'pre' || f.act === 'done' ? f.act : 'off';
-    res.text = ACT_TXT[res.state] + (!offNet && res.where ? ` · ${res.where}` : '') + (offNet && moving && m.spd > 8 ? ` · w drodze ${kmh(m.spd)}` : '');
+    const poi = net.nearPoi(pos[0], pos[1], 70);
+    res.text = ACT_TXT[res.state] + (poi ? ` · ${POI_AT[poi.kind]} ${poi.name}` : !offNet && res.where ? ` · ${res.where}` : '') + (offNet && moving && m.spd > 8 ? ` · w drodze ${kmh(m.spd)}` : '');
     const [x, y] = net.P(pos[0], pos[1]);
     const nn = net.nearNodes(x, y, 900).filter(a => net.stop(a[0])).sort((a, b) => a[1] - b[1])[0];
     if (nn) res.cand.push({ node: nn[0], t: 0, hold: true });
@@ -396,7 +397,9 @@ function predict(net, f, now = Date.now()) {
     const w = net.ways[wi];
     if (w.kind === 'lift' && w.pts[0] === n && (!liftBase || d < liftBase.d)) liftBase = { w, n, d };
   }
-  const label = { hut: 'w schronisku', wait: 'czeka na was', done: 'kończy jazdę' }[f.status];
+  const poi = net.nearPoi(pos[0], pos[1], 70);
+  if (poi) res.poi = poi;
+  const label = poi && f.status !== 'wait' ? `${POI_AT[poi.kind]} ${poi.name}` : { hut: 'w schronisku', wait: 'czeka na was', done: 'kończy jazdę' }[f.status];
   const nn = nearestNode();
   if (nn) res.cand.push({ node: nn[0], t: 0, hold: f.status === 'wait' || f.status === 'hut', slack: 180 });
   if (liftBase && !label) {
@@ -437,10 +440,8 @@ function addOptions(net, res, endNode, curWi, eta, onlyWay) {
   }
 }
 
-/* Route from me to the best place to catch the friend.
-   A node is reachable "in time" if I get there before the friend passes (plus slack where people pause). */
-function planMeet(net, me, pred) {
-  if (!net || !me || !pred || !pred.cand.length) return null;
+// Where can this person start from on the network? (on a lift: its top; on a piste: next node; else short walk)
+function startSources(net, me) {
   const mm = motion(me.track, me.pos[4]);
   const sn = net.snap(me.pos[0], me.pos[1], mm.hdg, mm.spd);
   const [x, y] = net.P(me.pos[0], me.pos[1]);
@@ -448,32 +449,22 @@ function planMeet(net, me, pred) {
   if (sn?.w && sn.d < 40 && sn.w.kind === 'lift' && mm.spd > 0.6) {
     const w = sn.w, end = w.pts[w.pts.length - 1];
     sources.push({ node: end, cost: (w.len - sn.along) / w.speed, w: w.wi, d: w.len - sn.along });
-  } else {
-    if (sn?.w && sn.d < 40 && sn.w.kind !== 'lift' && sn.i + 1 < sn.w.pts.length) {
-      const w = sn.w, k = sn.i + 1;
-      sources.push({ node: w.pts[k], cost: (w.cum[k] - sn.along) / w.speed, w: w.wi, d: w.cum[k] - sn.along });
-    }
-    // Standing or walking: you can stomp over to anything close (in a village up to ~10 min on foot).
-    const onPiste = sn?.w && sn.d < 40 && mm.spd > 2;
-    for (const [n, d] of net.nearNodes(x, y, onPiste ? 150 : 700)) if (net.stop(n)) sources.push({ node: n, cost: d / WALK_SPEED + (d > 15 ? 10 : 0), w: -1, d });
+    return sources;
   }
-  if (!sources.length) return { error: 'Jesteś poza siecią tras – podejdź bliżej stoku lub wyciągu.' };
-  const { dist, prev } = net.dijkstra(sources);
-
-  let best = null, late = null;
-  for (const c of pred.cand) {
-    const myT = dist.get(c.node.id); if (myT == null) continue;
-    const slack = c.hold ? Infinity : (c.slack || 30);
-    const meetT = Math.max(myT, c.t);
-    if (myT <= c.t + slack) { if (!best || meetT < best.meetT || (meetT === best.meetT && myT < best.myT)) best = { c, myT, meetT }; }
-    else { const l = myT - c.t; if (!late || l < late.lateBy) late = { c, myT, meetT: myT, lateBy: l }; }
+  if (sn?.w && sn.d < 40 && sn.w.kind !== 'lift' && sn.i + 1 < sn.w.pts.length) {
+    const w = sn.w, k = sn.i + 1;
+    sources.push({ node: w.pts[k], cost: (w.cum[k] - sn.along) / w.speed, w: w.wi, d: w.cum[k] - sn.along });
   }
-  const pick = best || late;
-  if (!pick) return { error: 'Nie znalazłem drogi po trasach do tego miejsca.' };
+  // Standing or walking: you can stomp over to anything close (in a village up to ~10 min on foot).
+  const onPiste = sn?.w && sn.d < 40 && mm.spd > 2;
+  for (const [n, d] of net.nearNodes(x, y, onPiste ? 150 : 700)) if (net.stop(n)) sources.push({ node: n, cost: d / WALK_SPEED + (d > 15 ? 10 : 0), w: -1, d });
+  return sources;
+}
 
-  // Rebuild path and group into steps.
+// Turn a Dijkstra result into a drawable line and grouped, human-sized steps.
+function buildRoute(net, me, prev, target) {
   const chain = [];
-  let cur = pick.c.node;
+  let cur = target;
   while (cur) { const p = prev.get(cur.id); chain.push({ node: cur, w: p ? p.w : -2, d: p ? p.d : 0 }); cur = p ? p.from : null; }
   chain.reverse();
   const line = [[me.pos[0], me.pos[1]], ...chain.map(c => [c.node.lat, c.node.lon])];
@@ -495,8 +486,91 @@ function planMeet(net, me, pred) {
     clean.push(s);
   }
   for (const s of clean) s.t = s.w ? s.d / s.w.speed + (s.w.kind === 'lift' ? LIFT_QUEUE : 0) : s.d / WALK_SPEED;
-  return { node: pick.c.node, myT: pick.myT, friendT: pick.c.t, meetT: pick.meetT, inTime: !!best, lateBy: best ? 0 : pick.lateBy, steps: clean, line };
+  return { line, steps: clean };
 }
+
+/* Route from me to the best place to catch the friend.
+   A node is reachable "in time" if I get there before the friend passes (plus slack where people pause). */
+function planMeet(net, me, pred) {
+  if (!net || !me || !pred || !pred.cand.length) return null;
+  const sources = startSources(net, me);
+  if (!sources.length) return { error: 'Jesteś poza siecią tras – podejdź bliżej stoku lub wyciągu.' };
+  const { dist, prev } = net.dijkstra(sources);
+  let best = null, late = null;
+  for (const c of pred.cand) {
+    const myT = dist.get(c.node.id); if (myT == null) continue;
+    const slack = c.hold ? Infinity : (c.slack || 30);
+    const meetT = Math.max(myT, c.t);
+    if (myT <= c.t + slack) { if (!best || meetT < best.meetT || (meetT === best.meetT && myT < best.myT)) best = { c, myT, meetT }; }
+    else { const l = myT - c.t; if (!late || l < late.lateBy) late = { c, myT, meetT: myT, lateBy: l }; }
+  }
+  const pick = best || late;
+  if (!pick) return { error: 'Nie znalazłem drogi po trasach do tego miejsca.' };
+  const { line, steps } = buildRoute(net, me, prev, pick.c.node);
+  return { node: pick.c.node, myT: pick.myT, friendT: pick.c.t, meetT: pick.meetT, inTime: !!best, lateBy: best ? 0 : pick.lateBy, steps, line };
+}
+
+/* Route from a person to a fixed point (meeting place, hut). The last bit off the network is walked. */
+function routeToPoint(net, me, lat, lon) {
+  if (!net || !me?.pos) return null;
+  const direct = haversine([me.pos[0], me.pos[1]], [lat, lon]);
+  if (direct < 60) return { here: true, myT: 0, steps: [], line: [[me.pos[0], me.pos[1]], [lat, lon]], dist: direct };
+  const sources = startSources(net, me);
+  const [x, y] = net.P(lat, lon);
+  const ends = net.nearNodes(x, y, 400).filter(a => net.stop(a[0]));
+  if (!sources.length || !ends.length) {
+    // Off the network on both or either side: just walk.
+    if (direct < 1500) return { myT: direct / WALK_SPEED, steps: [{ w: null, d: direct, t: direct / WALK_SPEED }], line: [[me.pos[0], me.pos[1]], [lat, lon]], dist: direct, walkOnly: true };
+    return { error: !sources.length ? 'Jesteś poza siecią tras – podejdź bliżej stoku lub wyciągu.' : 'To miejsce jest daleko od tras i wyciągów.' };
+  }
+  const { dist, prev } = net.dijkstra(sources, 3 * 3600);
+  let best = null;
+  for (const [n, d] of ends) { const t = dist.get(n.id); if (t == null) continue; const tt = t + d / WALK_SPEED; if (!best || tt < best.t) best = { n, d, t: tt }; }
+  if (!best) return { error: 'Nie znalazłem drogi po trasach do tego miejsca.' };
+  const r = buildRoute(net, me, prev, best.n);
+  if (best.d > 25) { r.steps.push({ w: null, d: best.d, t: best.d / WALK_SPEED }); r.line.push([lat, lon]); }
+  return { myT: best.t, steps: r.steps, line: r.line, node: best.n, dist: direct };
+}
+
+/* Huts, bars and restaurants near the pistes. */
+const POI_PL = { hut: 'schronisko', bar: 'bar', cafe: 'kawiarnia', food: 'restauracja' };
+const POI_AT = { hut: 'w schronisku', bar: 'w barze', cafe: 'w kawiarni', food: 'w restauracji' };
+async function fetchPois(bbox) {
+  const [s, w, n, e] = bbox;
+  const q = `[out:json][timeout:60];(nwr["amenity"~"^(restaurant|bar|cafe|pub|fast_food|biergarten)$"](${s},${w},${n},${e});nwr["tourism"~"^(alpine_hut|wilderness_hut)$"](${s},${w},${n},${e}););out center tags qt;`;
+  let lastErr;
+  for (const url of OVERPASS) {
+    try {
+      const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const out = [];
+      for (const el of (await r.json()).elements || []) {
+        const t = el.tags || {}, lat = el.lat ?? el.center?.lat, lon = el.lon ?? el.center?.lon;
+        if (lat == null || !t.name) continue;
+        let kind = { bar: 'bar', pub: 'bar', biergarten: 'bar', cafe: 'cafe' }[t.amenity] || 'food';
+        if (/hut/.test(t.tourism || '') || /rifugio|malga|baita|hütte|hutte|schronisko|refuge|chalet|bait/i.test(t.name)) kind = 'hut';
+        out.push([kind, t.name.slice(0, 50), +lat.toFixed(6), +lon.toFixed(6)]);
+      }
+      return out;
+    } catch (err) { lastErr = err; }
+  }
+  throw lastErr || new Error('Overpass niedostępny');
+}
+SkiNet.prototype.setPois = function (list) {
+  this.pois = [];
+  for (const [kind, name, lat, lon] of list) {
+    const [x, y] = this.P(lat, lon);
+    if (this.distToNet(lat, lon, 350) > 300) continue;   // keep places by the slopes, not every pizzeria in town
+    this.pois.push({ kind, name, lat, lon, x, y });
+  }
+};
+SkiNet.prototype.nearPoi = function (lat, lon, r = 60) {
+  if (!this.pois) return null;
+  const [x, y] = this.P(lat, lon);
+  let best = null;
+  for (const p of this.pois) { const d = Math.hypot(p.x - x, p.y - y); if (d <= r && (!best || d < best.d)) best = { ...p, d }; }
+  return best;
+};
 
 function kmh(ms) { return Math.round(ms * 3.6) + ' km/h'; }
 function fmtMin(s) { if (s < 60) return '<1 min'; const m = Math.round(s / 60); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; }

@@ -37,6 +37,24 @@ const S = {
 // Older profiles had a single name: treat it as the first name.
 if (S.me && !S.me.nick && !S.me.first && S.me.name) { S.me.first = S.me.name; }
 let G = null; // {topic,key}
+// Extension points used by stats.js and social.js.
+const HOOK = {
+  out: [],        // () => fields merged into my position message
+  friend: [],     // (friend, rawMsg, previous) after a friend update
+  topic: {},      // kind -> (id, payload) for /<kind>/<id> messages other than positions
+  pos: [],        // (pos, now) after my position updates
+  tick: [],       // (force) on every UI refresh
+  top: [],        // () => HTML cards above the crew list
+  act: {},        // data-act name -> (element) for clicks in the sheet
+  netReady: [],   // () after the piste network loads
+  longpress: null,// (latlng) long-press on the map
+  rank: null,     // () => HTML for the ranking tab
+};
+async function pubTopic(kind, id, obj, retain = true) {
+  if (!G) return;
+  const data = obj == null ? new Uint8Array(0) : await seal(obj);
+  for (const c of conns) if (c.connected) c.publish(`${G.topic}/${kind}/${id}`, data, { qos: 0, retain });
+}
 
 /* ---------- map ---------- */
 const map = L.map('map', { zoomControl: false, preferCanvas: true, tap: true }).setView(RESORT.center, 13);
@@ -57,7 +75,10 @@ const markers = new Map();
 let meMarker = null, meAcc = null;
 
 map.on('dragstart', () => { S.follow = false; });
-map.on('contextmenu', e => { if (S.me?.demo) { setMyPos([e.latlng.lat, e.latlng.lng, null, 5, 0, null], true); toast('Ustawiono Twoją pozycję (demo)'); } });
+map.on('contextmenu', e => {
+  if (HOOK.longpress) HOOK.longpress(e.latlng);
+  else if (S.me?.demo) { setMyPos([e.latlng.lat, e.latlng.lng, null, 5, 0, null], true); toast('Ustawiono Twoją pozycję (demo)'); }
+});
 
 $('#btnLayers').onclick = () => {
   map.removeLayer(baseLayers[baseIdx][1]);
@@ -146,6 +167,7 @@ async function loadNet(bbox, center, label, force) {
     if (!LS.set(key, data)) { for (const k of Object.keys(localStorage)) if (k.startsWith('ek.net:') && k !== key) LS.del(k); LS.set(key, data); }
   }
   S.net = new SkiNet(data, center);
+  for (const h of HOOK.netReady) try { h(); } catch (err) { console.error(err); }
   S.netMeta = { bbox, center, label }; LS.set('ek.netmeta', S.netMeta);
   hideBanner();
   drawNet(); drawArrows();
@@ -181,7 +203,7 @@ function connect() {
   if (typeof mqtt === 'undefined') { setConn(); return; }
   for (const url of BROKERS) {
     const c = mqtt.connect(url, { clientId: 'ek_' + S.me.id.slice(0, 10) + '_' + Math.random().toString(36).slice(2, 6), reconnectPeriod: 4000, connectTimeout: 12000, keepalive: 60, clean: true });
-    c.on('connect', () => { c.subscribe(G.topic + '/p/+', { qos: 0 }); setConn(); publish(true); });
+    c.on('connect', () => { c.subscribe(G.topic + '/+/+', { qos: 0 }); setConn(); publish(true); });
     c.on('close', setConn); c.on('offline', setConn); c.on('error', () => {});
     c.on('message', (topic, payload) => onMessage(topic, payload));
     conns.push(c);
@@ -200,7 +222,8 @@ $('#connChip').onclick = () => {
 };
 
 async function onMessage(topic, payload) {
-  const id = topic.split('/').pop();
+  const parts = topic.split('/'), id = parts.pop(), kind = parts.pop();
+  if (kind !== 'p') { HOOK.topic[kind]?.(id, payload); return; }
   if (!payload || payload.length === 0) { S.friends.delete(id); tick(); return; }
   let m; try { m = await unseal(new Uint8Array(payload)); } catch { return; }
   if (!m || m.id !== id || !Array.isArray(m.p)) return;
@@ -208,16 +231,19 @@ async function onMessage(topic, payload) {
   const cur = S.friends.get(id);
   if (cur && cur.t >= m.t) return;
   S.friends.set(id, { id, name: String(m.n || '?').slice(0, 20), full: String(m.fn || '').slice(0, 40), act: ['pre', 'ski', 'off', 'done'].includes(m.a) ? m.a : null, color: COLORS.includes(m.c) ? m.c : COLORS[0], status: m.s || 'ride', t: +m.t || 0, pos: m.p.map(Number), track: Array.isArray(m.tr) ? m.tr.map(p => p.map(Number)) : [] });
+  for (const h of HOOK.friend) try { h(S.friends.get(id), m, cur); } catch (err) { console.error(err); }
   tick();
 }
 
 async function publish(force) {
   if (!G || !S.me || S.me.share === false || !S.myPos) return;
   const now = Date.now();
+  if ((S.me.hideUntil || 0) > now) return;
   if (!force && now - S.lastPub < MODE_PUB[S.gpsMode]) return;
   S.lastPub = now;
   const p = S.myPos.map((v, i) => v == null || !isFinite(v) ? null : +(+v).toFixed(i < 2 ? 6 : 1));
   const msg = { v: 1, id: S.me.id, n: displayName(S.me), fn: fullName(S.me), a: S.act, c: S.me.color, s: S.me.status, t: now, p, tr: S.myTrack.slice(-20) };
+  for (const h of HOOK.out) Object.assign(msg, h());
   const data = await seal(msg);
   for (const c of conns) if (c.connected) c.publish(G.topic + '/p/' + S.me.id, data, { qos: 0, retain: true });
 }
@@ -263,7 +289,7 @@ async function startNativeGps() {
   }
   if (!S.myPos) showBanner('Czekam na sygnał GPS… zezwól na lokalizację.');
   try { const r = await Loc.start({ mode: S.gpsMode }); S.auth = r.auth; if (r.auth === 'whenInUse') askAlways(); }
-  catch { S.gpsError = 'Nie udało się uruchomić GPS.'; showBanner(S.gpsError); }
+  catch (e) { S.gpsError = 'Nie udało się uruchomić GPS (' + (e?.message || e) + ').'; showBanner(S.gpsError); }
 }
 // "Always" lets the phone report from a pocket. iOS shows its own prompt once; after that only Settings can change it.
 let alwaysNagged = false;
@@ -355,6 +381,7 @@ function setMyPos(p, manual) {
   else if (!S.stillSince) { S.stillSince = now; S.stillRef = [p[0], p[1]]; }
   if (S.net) S.myPred = predict(S.net, { t: now, pos: p, track: S.myTrack, status: S.me?.status, act: S.act }, now);
   const actChanged = updateActivity();
+  for (const h of HOOK.pos) try { h(p, now); } catch (err) { console.error(err); }
   const prevMode = S.gpsMode;
   setGpsMode();
   publish(manual || actChanged || (prevMode !== S.gpsMode && S.gpsMode === 'active'));
@@ -410,7 +437,9 @@ function startDemo() {
       const ll = alongLL(S.net, b.w, Math.min(b.along, b.w.len));
       const last = b.track[b.track.length - 1];
       if (!last || now - last[2] >= 4000) { b.track.push([ll[0], ll[1], now]); if (b.track.length > 20) b.track.shift(); }
-      S.friends.set(b.id, { id: b.id, name: b.name, color: b.color, status: 'ride', t: now, pos: [ll[0], ll[1], null, 6, b.wait > 0 ? 0 : b.w.speed, null], track: b.track.slice(), act: 'ski', demo: true });
+      b.st = b.st || { skiM: 2000 + Math.random() * 6000, liftM: 3000 + Math.random() * 5000, vertM: 800 + Math.random() * 1500, runs: 3 + (Math.random() * 6 | 0), maxV: 14 + Math.random() * 8 };
+      if (b.wait <= 0) { if (b.w.kind === 'lift') b.st.liftM += b.w.speed * dt; else { b.st.skiM += b.w.speed * 1.2 * dt; b.st.maxV = Math.max(b.st.maxV, b.w.speed * 1.2 + Math.random() * 6); } }
+      S.friends.set(b.id, { id: b.id, name: b.name, color: b.color, status: 'ride', t: now, pos: [ll[0], ll[1], null, 6, b.wait > 0 ? 0 : b.w.speed, null], track: b.track.slice(), act: 'ski', demo: true, st: b.st });
     }
     tick();
   };
@@ -436,6 +465,7 @@ function tick(force) {
   for (const f of fr) S.preds.set(f.id, predict(S.net, f, now));
   drawMarkers(fr);
   drawPredictions(fr);
+  for (const h of HOOK.tick) try { h(force); } catch (err) { console.error(err); }
   if (S.selected && (force || now - S.planAt > 5000)) computePlan();
   renderSheet(fr, force);
   lastFull = now;
@@ -518,7 +548,8 @@ function renderSheet(fr, force) {
   let html;
   if (S.selected && S.friends.has(S.selected)) html = detailHtml(S.friends.get(S.selected));
   else { S.selected = null; html = listHtml(fr); }
-  if (html !== renderSheet.last && !(Date.now() < (renderSheet.holdUntil || 0) && !force)) {
+  const typing = document.activeElement?.tagName === 'INPUT' && document.activeElement.closest('#sheetBody');
+  if (html !== renderSheet.last && !typing && !(Date.now() < (renderSheet.holdUntil || 0) && !force)) {
     renderSheet.last = html; body.innerHTML = html;
     const ns = body.querySelector('.list,.detail'); if (ns) ns.scrollTop = scroll;
   }
@@ -546,7 +577,10 @@ function listHtml(fr) {
       <div class="rt">${d != null ? `<div class="d">${arrowSvg(brg)} ${fmtDist(d)}</div>` : ''}<div class="ago">${agoTxt(f.t)}</div></div></button>`;
   }).join('');
   if (!fr.length) rows = `<div class="empty">Nikogo jeszcze nie widać. Wyślij znajomym link do aplikacji i kod grupy <b>${esc(S.me?.group || '')}</b>. Pojawią się tu, gdy włączą aplikację na stoku.<br><br><button class="btn" data-act="demo">Pokaż demo z symulowanymi znajomymi</button></div>`;
-  return `<h2>Ekipa <span class="count">${fr.length}</span><span class="small" style="text-transform:none;letter-spacing:0;font-family:var(--body)">· ${S.myPos ? `Ty: ${ACT_PL[S.act]}${S.me?.share === false ? ' · ukryty' : ''}` : 'brak Twojej pozycji'}</span></h2>${status}<div class="list">${rows}</div>`;
+  const tabs = `<div class="tabs" role="tablist"><button data-act="tab" data-tab="crew" class="${S.tab !== 'rank' ? 'on' : ''}">Ekipa <span class="count">${fr.length}</span></button><button data-act="tab" data-tab="rank" class="${S.tab === 'rank' ? 'on' : ''}">Ranking dnia</button></div>`;
+  if (S.tab === 'rank' && HOOK.rank) return tabs + `<div class="list">${HOOK.rank()}</div>`;
+  const top = HOOK.top.map(h => { try { return h(); } catch (err) { console.error(err); return ''; } }).join('');
+  return tabs + `<h2 class="me-line">${S.myPos ? `Ty: ${ACT_PL[S.act]}${S.me?.share === false ? ' · nie udostępniasz pozycji' : (S.me?.hideUntil || 0) > Date.now() ? ' · ukryty do ' + new Date(S.me.hideUntil).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : ''}` : 'Brak Twojej pozycji'}</h2>${status}<div class="list">${top}${rows}</div>`;
 }
 
 function detailHtml(f) {
@@ -599,6 +633,8 @@ $('#sheetBody').addEventListener('click', e => {
   if (act === 'back') deselect();
   else if (act === 'center') { const f = S.friends.get(S.selected); if (f) { S.follow = false; map.setView([f.pos[0], f.pos[1]], 16); } }
   else if (act === 'demo') { S.me.demo = true; saveMe(); applyMode(); }
+  else if (act === 'tab') { S.tab = e.target.closest('[data-tab]').dataset.tab; tick(true); }
+  else if (HOOK.act[act]) HOOK.act[act](e.target.closest('[data-act]'));
 });
 $('#handle').onclick = () => { S.sheetOpen = !S.sheetOpen; renderSheet(visibleFriends(), true); };
 // The list refreshes in the background; don't let a refresh swap the row under a finger mid-tap.
