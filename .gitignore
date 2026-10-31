@@ -5,3 +5,4 @@ ios/App/App/config.xml
 ios/App/build/
 ios/DerivedData/
 .DS_Store
+ios/build/
