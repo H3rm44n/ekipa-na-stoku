@@ -173,6 +173,22 @@ class SkiNet {
     }
   }
 
+  // Metres to the nearest piste or lift (0 inside a piste area), Infinity if none within r.
+  distToNet(lat, lon, r = 150) {
+    const [x, y] = this.P(lat, lon);
+    let best = Infinity;
+    for (const wi of this.nearWays(x, y, r)) {
+      const w = this.ways[wi];
+      if (w.kind === 'area') { if (inPoly(x, y, w.pts)) return 0; continue; }
+      for (let i = 0; i < w.pts.length - 1; i++) {
+        const a = w.pts[i], b = w.pts[i + 1], dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / L2));
+        best = Math.min(best, Math.hypot(a.x + dx * t - x, a.y + dy * t - y));
+      }
+    }
+    return best;
+  }
+
   // Best way under a position, weighted by distance and by how well the heading matches the way's direction.
   snap(lat, lon, hdg, spd) {
     const [x, y] = this.P(lat, lon);
@@ -307,6 +323,7 @@ function predict(net, f, now = Date.now()) {
   const m = motion(f.track, f.pos[4]);
   const res = { age, m, state: 'unknown', text: '', where: '', path: [], options: [], cand: [], eta: null, endLL: null };
   const moving = m.spd > 0.9;
+  const ACT_TXT = { pre: 'jeszcze nie wyszedł(a) na stok', done: 'skończył(a) jazdę', off: 'poza stokiem' };
   if (!net) {
     res.state = moving ? 'move' : 'stop';
     res.text = moving ? `jedzie ${kmh(m.spd)}` : 'stoi';
@@ -322,6 +339,17 @@ function predict(net, f, now = Date.now()) {
     const nn = nearestNode(); if (nn) res.cand.push({ node: nn[0], t: 0, hold: true });
     return res;
   }
+  // Away from every piste and lift, or the phone itself says the day has not started / is over.
+  const offNet = net.distToNet(pos[0], pos[1], 200) > 150;
+  if (offNet || ((f.act === 'pre' || f.act === 'done') && !moving)) {
+    res.state = f.act === 'pre' || f.act === 'done' ? f.act : 'off';
+    res.text = ACT_TXT[res.state] + (!offNet && res.where ? ` · ${res.where}` : '') + (offNet && moving && m.spd > 8 ? ` · w drodze ${kmh(m.spd)}` : '');
+    const [x, y] = net.P(pos[0], pos[1]);
+    const nn = net.nearNodes(x, y, 900).filter(a => net.stop(a[0])).sort((a, b) => a[1] - b[1])[0];
+    if (nn) res.cand.push({ node: nn[0], t: 0, hold: true });
+    return res;
+  }
+
   if (sn?.w && sn.d < 45 && (moving || (sn.w.kind === 'lift' && m.spd > 0.4))) {
     const w = sn.w, onLift = w.kind === 'lift';
     const speed = onLift ? (m.spd > 0.8 ? Math.min(m.spd, 9) : w.speed) : Math.max(m.spd, 3.5);

@@ -133,6 +133,8 @@ input:focus,button:focus-visible{outline:3px solid color-mix(in srgb,var(--accen
 .toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:500;font-size:14px;flex-direction:row}
 .toggle input{width:22px;height:22px;accent-color:var(--accent)}
 .hr{height:1px;background:var(--line)}
+.names{display:flex;flex-direction:column;gap:10px}
+.opt{font-weight:500;color:var(--muted)}
 .note{font-size:12px;color:var(--muted);line-height:1.45}
 
 /* map markers */
@@ -179,9 +181,12 @@ input:focus,button:focus-visible{outline:3px solid color-mix(in srgb,var(--accen
   <form class="panel" id="setupForm">
     <h1>Ekipa na stoku</h1>
     <p>Widzisz na mapie stoku, gdzie są znajomi, dokąd jadą i jak do nich dojechać.</p>
-    <label for="inName">Twoje imię
-      <input type="text" id="inName" maxlength="16" autocomplete="given-name" placeholder="np. Kuba" required>
-    </label>
+    <div class="names">
+      <label for="inNick">Ksywka<input type="text" id="inNick" maxlength="20" autocomplete="nickname" placeholder="np. Hermes"></label>
+      <label for="inFirst">Imię<input type="text" id="inFirst" maxlength="20" autocomplete="given-name" placeholder="np. Kuba"></label>
+      <label for="inLast"><span>Nazwisko <span class="opt">(nieobowiązkowe)</span></span><input type="text" id="inLast" maxlength="30" autocomplete="family-name"></label>
+      <p class="note">Wpisz ksywkę albo imię. Na mapie znajomi zobaczą ksywkę, a jeśli jej nie podasz, imię.</p>
+    </div>
     <div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Kolor na mapie</div><div class="colors" id="inColors"></div></div>
     <label for="inGroup">Kod grupy (taki sam u wszystkich)
       <div class="rowflex"><input type="text" id="inGroup" maxlength="40" autocapitalize="none" autocomplete="off" spellcheck="false" required>
@@ -195,11 +200,17 @@ input:focus,button:focus-visible{outline:3px solid color-mix(in srgb,var(--accen
 <div class="modal" id="settings" hidden>
   <div class="panel">
     <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase">Ustawienia</b></div><button class="close" data-close aria-label="Zamknij">×</button></div>
-    <label for="stName">Imię<input type="text" id="stName" maxlength="16"></label>
+    <div class="names">
+      <label for="stNick">Ksywka<input type="text" id="stNick" maxlength="20" autocomplete="nickname"></label>
+      <label for="stFirst">Imię<input type="text" id="stFirst" maxlength="20" autocomplete="given-name"></label>
+      <label for="stLast"><span>Nazwisko <span class="opt">(nieobowiązkowe)</span></span><input type="text" id="stLast" maxlength="30" autocomplete="family-name"></label>
+    </div>
     <div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Kolor</div><div class="colors" id="stColors"></div></div>
     <div class="box"><h3>Kod grupy</h3><div class="rowflex" style="align-items:center"><code id="stGroup" style="flex:1;font-size:16px;font-weight:600;user-select:all;word-break:break-all"></code><button class="btn" id="btnCopy">Kopiuj</button></div>
       <p class="note" style="margin-top:6px">Znajomi wpisują ten sam kod po otwarciu aplikacji.</p></div>
     <div class="hr"></div>
+    <div class="box"><h3>Bateria i GPS</h3><p class="small" id="stBatt">–</p></div>
+    <label class="toggle" for="stEco">Tryb oszczędny (rzadszy GPS przy zjazdach)<input type="checkbox" id="stEco"></label>
     <label class="toggle" for="stWake">Nie wygaszaj ekranu (lepsze śledzenie)<input type="checkbox" id="stWake"></label>
     <label class="toggle" for="stShare">Udostępniaj moją pozycję<input type="checkbox" id="stShare"></label>
     <label class="toggle" for="stDemo">Tryb demo (symulowani znajomi)<input type="checkbox" id="stDemo"></label>
@@ -207,7 +218,7 @@ input:focus,button:focus-visible{outline:3px solid color-mix(in srgb,var(--accen
     <div class="box"><h3>Mapa tras</h3><p class="small" id="stNet">–</p>
       <div class="actions" style="margin-top:8px"><button class="btn" id="btnNetResort">Madonna di Campiglio</button><button class="btn" id="btnNetHere">Ośrodek w widoku mapy</button></div></div>
     <div class="actions"><button class="btn primary" id="btnSave">Zapisz</button><button class="btn" id="btnLeave" style="color:var(--bad)">Opuść grupę</button></div>
-    <p class="note">Pozycje przesyłane są zaszyfrowane (AES‑GCM, klucz z kodu grupy) przez publiczne serwery MQTT HiveMQ i EMQX. Trasy i wyciągi: © OpenStreetMap. Gdy aplikacja jest w tle lub ekran zgaszony, telefon może przestać wysyłać pozycję.</p>
+    <p class="note">Pozycje przesyłane są zaszyfrowane (AES‑GCM, klucz z kodu grupy) przez publiczne serwery MQTT HiveMQ i EMQX. Trasy i wyciągi: © OpenStreetMap. W aplikacji na iPhone GPS sam przechodzi w tryb oszczędny, gdy stoisz, jedziesz wyciągiem albo jesteś poza stokiem.</p>
   </div>
 </div>
 

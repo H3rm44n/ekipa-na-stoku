@@ -14,6 +14,14 @@ const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084
 const COLORS = ['#ff6b00', '#d6249f', '#16a34a', '#7c3aed', '#eab308', '#0891b2', '#a16207', '#e11d48'];
 const STATUSES = [['ride', 'Jeżdżę'], ['wait', 'Czekam na was'], ['hut', 'W schronisku'], ['done', 'Kończę']];
 const MAX_AGE_SHOW = 8 * 3600e3;
+// How often a position goes out per GPS mode. Fewer sends = radio sleeps more = less battery.
+const MODE_PUB = { active: 8000, lift: 15000, idle: 45000, saver: 180000 };
+const MODE_PL = { active: 'dokładny (jazda)', lift: 'średni (wyciąg)', idle: 'oszczędny (postój)', saver: 'minimalny (poza stokiem)' };
+const ACT_PL = { pre: 'przed jazdą', ski: 'na stoku', off: 'poza stokiem', done: 'koniec jazdy' };
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+function loadDay() { const d = LS.get('ek.day', null); return d && d.date === todayKey() ? d : { date: todayKey(), skied: 0, lastOn: 0 }; }
+const displayName = m => (m?.nick || '').trim() || (m?.first || '').trim() || (m?.name || '').trim() || '?';
+const fullName = m => [m?.first, m?.last].map(v => (v || '').trim()).filter(Boolean).join(' ');
 
 const S = {
   me: LS.get('ek.me', null),          // {id,name,color,group,status,share,wake,demo}
@@ -23,7 +31,11 @@ const S = {
   net: null, netMeta: LS.get('ek.netmeta', null),
   selected: null, plan: null, planAt: 0,
   sheetOpen: false, gpsError: null, follow: true,
+  gpsMode: 'active', modeAt: 0, wakeUntil: 0, stillSince: 0, stillRef: null,
+  day: loadDay(), act: 'pre', myPred: null, auth: null, batt: null,
 };
+// Older profiles had a single name: treat it as the first name.
+if (S.me && !S.me.nick && !S.me.first && S.me.name) { S.me.first = S.me.name; }
 let G = null; // {topic,key}
 
 /* ---------- map ---------- */
@@ -37,6 +49,7 @@ let baseIdx = LS.get('ek.base', 0) % baseLayers.length;
 baseLayers[baseIdx][1].addTo(map);
 const renderer = L.canvas({ padding: 0.3, tolerance: 8 });
 const netLayer = L.layerGroup().addTo(map);
+const arrowLayer = L.layerGroup().addTo(map);
 const predLayer = L.layerGroup().addTo(map);
 const routeLayer = L.layerGroup().addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
@@ -86,6 +99,40 @@ function drawNet() {
   }
 }
 
+// Small chevrons along each piste pointing downhill (lifts: uphill), sized in screen pixels.
+function drawArrows() {
+  arrowLayer.clearLayers();
+  if (!S.net) return;
+  const z = map.getZoom();
+  if (z < 14) return;
+  const mpp = 156543.03 * Math.cos(S.net.lat0 * Math.PI / 180) / 2 ** z;   // metres per pixel
+  const gap = 85 * mpp, arm = 6 * mpp, view = map.getBounds().pad(0.2);
+  const lines = { };
+  for (const w of S.net.ways) {
+    if (w.kind === 'area' || w.kind === 'conn' || w.len < gap * 0.8) continue;
+    const color = w.kind === 'lift' ? '#22313f' : (DIFF_COLOR[w.diff] || '#d42a2a');
+    const out = lines[color] || (lines[color] = []);
+    for (let d = gap / 2; d < w.len; d += gap) {
+      let i = 0; while (i < w.cum.length - 2 && w.cum[i + 1] < d) i++;
+      const a = w.pts[i], b = w.pts[i + 1], L = w.cum[i + 1] - w.cum[i] || 1, t = (d - w.cum[i]) / L;
+      const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+      const ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;   // unit vector in travel direction
+      const tip = S.net.LL(x + ux * arm * 0.6, y + uy * arm * 0.6);
+      if (!view.contains(tip)) continue;
+      const c = Math.cos(0.6), sn = Math.sin(0.6);
+      const l1 = S.net.LL(x - arm * (ux * c - uy * sn), y - arm * (uy * c + ux * sn));
+      const l2 = S.net.LL(x - arm * (ux * c + uy * sn), y - arm * (uy * c - ux * sn));
+      out.push([l1, tip, l2]);
+    }
+  }
+  for (const [color, segs] of Object.entries(lines)) {
+    if (!segs.length) continue;
+    arrowLayer.addLayer(L.polyline(segs, { renderer, color: '#fff', weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round', interactive: false }));
+    arrowLayer.addLayer(L.polyline(segs, { renderer, color, weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', interactive: false }));
+  }
+}
+map.on('zoomend moveend', () => { if (!document.hidden) drawArrows(); });
+
 async function loadNet(bbox, center, label, force) {
   const key = 'ek.net:' + bbox.join(',');
   let data = !force && LS.get(key, null);
@@ -101,7 +148,7 @@ async function loadNet(bbox, center, label, force) {
   S.net = new SkiNet(data, center);
   S.netMeta = { bbox, center, label }; LS.set('ek.netmeta', S.netMeta);
   hideBanner();
-  drawNet();
+  drawNet(); drawArrows();
   const lifts = S.net.ways.filter(w => w.kind === 'lift').length, pistes = S.net.ways.filter(w => w.kind === 'piste').length;
   $('#stNet').textContent = `${label}: ${pistes} odcinków tras, ${lifts} wyciągów.`;
   if (S.me?.demo) startDemo();
@@ -133,7 +180,7 @@ function connect() {
   disconnect();
   if (typeof mqtt === 'undefined') { setConn(); return; }
   for (const url of BROKERS) {
-    const c = mqtt.connect(url, { clientId: 'ek_' + S.me.id.slice(0, 10) + '_' + Math.random().toString(36).slice(2, 6), reconnectPeriod: 4000, connectTimeout: 12000, keepalive: 30, clean: true });
+    const c = mqtt.connect(url, { clientId: 'ek_' + S.me.id.slice(0, 10) + '_' + Math.random().toString(36).slice(2, 6), reconnectPeriod: 4000, connectTimeout: 12000, keepalive: 60, clean: true });
     c.on('connect', () => { c.subscribe(G.topic + '/p/+', { qos: 0 }); setConn(); publish(true); });
     c.on('close', setConn); c.on('offline', setConn); c.on('error', () => {});
     c.on('message', (topic, payload) => onMessage(topic, payload));
@@ -160,28 +207,30 @@ async function onMessage(topic, payload) {
   if (id === S.me.id) return;
   const cur = S.friends.get(id);
   if (cur && cur.t >= m.t) return;
-  S.friends.set(id, { id, name: String(m.n || '?').slice(0, 16), color: COLORS.includes(m.c) ? m.c : COLORS[0], status: m.s || 'ride', t: +m.t || 0, pos: m.p.map(Number), track: Array.isArray(m.tr) ? m.tr.map(p => p.map(Number)) : [] });
+  S.friends.set(id, { id, name: String(m.n || '?').slice(0, 20), full: String(m.fn || '').slice(0, 40), act: ['pre', 'ski', 'off', 'done'].includes(m.a) ? m.a : null, color: COLORS.includes(m.c) ? m.c : COLORS[0], status: m.s || 'ride', t: +m.t || 0, pos: m.p.map(Number), track: Array.isArray(m.tr) ? m.tr.map(p => p.map(Number)) : [] });
   tick();
 }
 
 async function publish(force) {
   if (!G || !S.me || S.me.share === false || !S.myPos) return;
-  const now = Date.now(), moving = (S.myPos[4] || 0) > 1.5;
-  if (!force && now - S.lastPub < (moving ? 4000 : 10000)) return;
+  const now = Date.now();
+  if (!force && now - S.lastPub < MODE_PUB[S.gpsMode]) return;
   S.lastPub = now;
   const p = S.myPos.map((v, i) => v == null || !isFinite(v) ? null : +(+v).toFixed(i < 2 ? 6 : 1));
-  const msg = { v: 1, id: S.me.id, n: S.me.name, c: S.me.color, s: S.me.status, t: now, p, tr: S.myTrack.slice(-20) };
+  const msg = { v: 1, id: S.me.id, n: displayName(S.me), fn: fullName(S.me), a: S.act, c: S.me.color, s: S.me.status, t: now, p, tr: S.myTrack.slice(-20) };
   const data = await seal(msg);
   for (const c of conns) if (c.connected) c.publish(G.topic + '/p/' + S.me.id, data, { qos: 0, retain: true });
 }
 function clearMine() { if (G && S.me) for (const c of conns) if (c.connected) c.publish(G.topic + '/p/' + S.me.id, new Uint8Array(0), { qos: 0, retain: true }); }
-setInterval(() => publish(true), 30000);
+// Heartbeat keeps "last seen" fresh, at most as often as the current mode allows.
+setInterval(() => { if (Date.now() - S.lastPub > Math.max(60000, MODE_PUB[S.gpsMode])) publish(true); }, 30000);
 
 /* ---------- GPS ---------- */
-// In the iPhone app GPS comes from a native plugin that keeps reporting with the screen locked.
+// In the iPhone app GPS comes from our own native module (ios/App/App/SkiLocation.swift),
+// which keeps reporting with the screen locked and lowers GPS power when you are not riding.
 const NATIVE = !!window.Capacitor?.isNativePlatform?.();
-const BgGeo = NATIVE ? window.Capacitor.registerPlugin('BackgroundGeolocation') : null;
-let watchId = null, nativeWatch = null;
+const Loc = NATIVE ? window.Capacitor.registerPlugin('SkiLocation') : null;
+let watchId = null, nativeListeners = false;
 function startGps() {
   if (S.me?.demo) return;
   if (NATIVE) { startNativeGps(); return; }
@@ -199,44 +248,121 @@ function startGps() {
 }
 function stopGps() {
   if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-  if (nativeWatch != null) { BgGeo.removeWatcher({ id: nativeWatch }).catch(() => {}); nativeWatch = null; }
+  if (NATIVE) Loc.stop().catch(() => {});
 }
 async function startNativeGps() {
-  if (nativeWatch != null) return;
-  showBanner('Czekam na sygnał GPS… zezwól na lokalizację.');
-  try {
-    nativeWatch = await BgGeo.addWatcher({
-      backgroundMessage: 'Znajomi widzą, gdzie jesteś na stoku.',
-      backgroundTitle: 'Ekipa udostępnia lokalizację',
-      requestPermissions: true, stale: false, distanceFilter: 5,
-    }, (loc, err) => {
-      if (err) {
-        if (err.code === 'NOT_AUTHORIZED') {
-          S.gpsError = 'Brak zgody na lokalizację. Włącz ją w Ustawieniach iPhone’a → Ekipa → Lokalizacja (najlepiej „Zawsze”).';
-          showBanner(S.gpsError, 'Ustawienia', () => BgGeo.openSettings());
-        } else if (!S.myPos) { S.gpsError = 'Nie mogę ustalić pozycji (słaby sygnał GPS).'; showBanner(S.gpsError); }
-        return;
-      }
-      if (!loc) return;
-      S.gpsError = null;
-      setMyPos([loc.latitude, loc.longitude, loc.altitude, loc.accuracy, loc.speed, loc.bearing]);
+  if (!nativeListeners) {
+    nativeListeners = true;
+    Loc.addListener('location', l => { S.gpsError = null; setMyPos([l.latitude, l.longitude, l.altitude, l.accuracy, l.speed, l.bearing]); });
+    Loc.addListener('error', e => {
+      if (e.code !== 'NOT_AUTHORIZED') return;
+      S.gpsError = 'Brak zgody na lokalizację. Włącz ją w Ustawieniach iPhone’a → Ekipa → Lokalizacja (najlepiej „Zawsze”).';
+      showBanner(S.gpsError, 'Ustawienia', () => Loc.openSettings());
     });
-  } catch { S.gpsError = 'Nie udało się uruchomić GPS.'; showBanner(S.gpsError); }
+    Loc.addListener('auth', a => { S.auth = a.status; if (a.status === 'whenInUse') askAlways(); });
+  }
+  if (!S.myPos) showBanner('Czekam na sygnał GPS… zezwól na lokalizację.');
+  try { const r = await Loc.start({ mode: S.gpsMode }); S.auth = r.auth; if (r.auth === 'whenInUse') askAlways(); }
+  catch { S.gpsError = 'Nie udało się uruchomić GPS.'; showBanner(S.gpsError); }
 }
+// "Always" lets the phone report from a pocket. iOS shows its own prompt once; after that only Settings can change it.
+let alwaysNagged = false;
+function askAlways() {
+  if (!LS.get('ek.askedAlways', false)) { LS.set('ek.askedAlways', true); Loc.requestAlways().catch(() => {}); return; }
+  if (alwaysNagged) return;
+  alwaysNagged = true;
+  setTimeout(() => {
+    showBanner('Ustaw lokalizację „Zawsze”, żeby znajomi widzieli Cię z telefonem w kieszeni.', 'Ustawienia', () => { hideBanner(); Loc.openSettings(); });
+    setTimeout(() => hideBannerIf('Zawsze'), 12000);
+  }, 4000);
+}
+
+/* ---------- day state + battery-aware GPS modes ---------- */
+// pre: not on the slope yet today · ski: on/near pistes · off: left the slope mid-day · done: finished for the day
+function updateActivity() {
+  if (S.day.date !== todayKey()) S.day = { date: todayKey(), skied: 0, lastOn: 0 };
+  const p = S.myPos; if (!p || !S.net) return false;
+  const now = Date.now(), near = S.net.distToNet(p[0], p[1], 160) <= 120;
+  const m = motion(S.myTrack, p[4]);
+  if (near) {
+    S.day.lastOn = now;
+    if (!S.day.skied && (m.spd > 2 || S.myPred?.state === 'lift')) S.day.skied = now;
+  }
+  LS.set('ek.day', S.day);
+  const prev = S.act;
+  if (S.me.status === 'done') S.act = 'done';
+  else if (near) S.act = S.day.skied ? 'ski' : 'pre';
+  else if (!S.day.skied) S.act = 'pre';
+  else S.act = (now - S.day.lastOn > 45 * 60e3 && new Date().getHours() >= 15) ? 'done' : 'off';
+  return prev !== S.act;
+}
+function chooseMode() {
+  const now = Date.now();
+  if (S.me?.demo) return 'active';
+  if (now < S.wakeUntil) return 'active';
+  if (S.act === 'pre' || S.act === 'done') return 'saver';
+  if (S.act === 'off') return now - S.day.lastOn > 15 * 60e3 ? 'saver' : 'idle';
+  if (S.myPred?.state === 'lift') return 'lift';
+  if (S.stillSince && now - S.stillSince > 120e3) return 'idle';
+  return S.me?.eco ? 'lift' : 'active';
+}
+function setGpsMode(force) {
+  const want = chooseMode(), now = Date.now();
+  if (want === S.gpsMode && !force) return;
+  // Step down slowly (avoid flapping), step up to full accuracy at once.
+  if (!force && want !== 'active' && now - S.modeAt < 30000) return;
+  S.gpsMode = want; S.modeAt = now;
+  if (NATIVE) Loc.setMode({ mode: want }).catch(() => {});
+}
+
+// Battery log (iPhone app only): one sample every 5 minutes, used to show real drain in %/h.
+let lastBatt = 0;
+async function sampleBattery(force) {
+  if (!NATIVE || (!force && Date.now() - lastBatt < 5 * 60e3)) return;
+  lastBatt = Date.now();
+  try {
+    const b = await Loc.battery(); S.batt = b;
+    if (b.level < 0) return;
+    const log = LS.get('ek.batt', []).filter(x => Date.now() - x[0] < 24 * 3600e3);
+    log.push([Date.now(), +b.level.toFixed(3), b.state === 'unplugged' ? 0 : 1, S.gpsMode]);
+    LS.set('ek.batt', log.slice(-300));
+  } catch {}
+}
+function batteryRate() {
+  const log = LS.get('ek.batt', []);
+  let i = log.length - 1; if (i < 1) return null;
+  while (i > 0 && !log[i - 1][2] && !log[i][2]) i--;   // walk back over the current unplugged stretch
+  const a = log[i], b = log[log.length - 1], h = (b[0] - a[0]) / 3600e3;
+  if (b[2] || h < 0.5) return null;
+  return { perHour: Math.max(0, (a[1] - b[1]) * 100 / h), hours: h };
+}
+setInterval(() => { sampleBattery(); if (S.myPos) { updateActivity(); setGpsMode(); } }, 60000);
 
 function setMyPos(p, manual) {
   const first = !S.myPos;
+  const now = Date.now();
+  // A fix arriving in saver mode means you moved a few hundred metres: look closely for a few minutes.
+  if (S.gpsMode === 'saver' && S.myPos && haversine(S.myPos, p) > 150) S.wakeUntil = now + 180e3;
   S.myPos = p;
-  const now = Date.now(), last = S.myTrack[S.myTrack.length - 1];
+  const last = S.myTrack[S.myTrack.length - 1];
   if (manual) S.myTrack = [];
   if (!last || now - last[2] >= 4000 || manual) { S.myTrack.push([+p[0].toFixed(6), +p[1].toFixed(6), now]); if (S.myTrack.length > 40) S.myTrack.shift(); }
   if (first || manual) { hideBannerIf('GPS'); if (first) map.setView([p[0], p[1]], Math.max(map.getZoom(), 15)); }
   else if (S.follow && !S.selected && !map.getBounds().pad(-0.2).contains([p[0], p[1]])) map.panTo([p[0], p[1]]);
-  publish(manual);
+  // Standing still? (speed from GPS, or under 25 m from where you stopped)
+  const spd = p[4] != null && p[4] >= 0 ? p[4] : motion(S.myTrack).spd;
+  if (spd > 1.2 || (S.stillRef && haversine(S.stillRef, p) > 25)) { S.stillSince = 0; S.stillRef = null; }
+  else if (!S.stillSince) { S.stillSince = now; S.stillRef = [p[0], p[1]]; }
+  if (S.net) S.myPred = predict(S.net, { t: now, pos: p, track: S.myTrack, status: S.me?.status, act: S.act }, now);
+  const actChanged = updateActivity();
+  const prevMode = S.gpsMode;
+  setGpsMode();
+  publish(manual || actChanged || (prevMode !== S.gpsMode && S.gpsMode === 'active'));
+  sampleBattery();
   drawMe();
 }
 function drawMe() {
-  if (!S.myPos) return;
+  if (!S.myPos || document.hidden) return;
   const ll = [S.myPos[0], S.myPos[1]];
   if (!meMarker) {
     meMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [22, 22] }), zIndexOffset: 1000, keyboard: false }).addTo(map).bindTooltip('Ty', { direction: 'top', offset: [0, -10] });
@@ -252,7 +378,7 @@ async function applyWake() {
     else if (wakeLock) { await wakeLock.release(); wakeLock = null; }
   } catch { wakeLock = null; }
 }
-document.addEventListener('visibilitychange', () => { applyWake(); if (document.visibilityState === 'visible') { publish(true); tick(true); } });
+document.addEventListener('visibilitychange', () => { applyWake(); if (document.visibilityState === 'visible') { drawMe(); publish(true); tick(true); } });
 
 /* ---------- demo bots ---------- */
 let demoTimer = null;
@@ -284,7 +410,7 @@ function startDemo() {
       const ll = alongLL(S.net, b.w, Math.min(b.along, b.w.len));
       const last = b.track[b.track.length - 1];
       if (!last || now - last[2] >= 4000) { b.track.push([ll[0], ll[1], now]); if (b.track.length > 20) b.track.shift(); }
-      S.friends.set(b.id, { id: b.id, name: b.name, color: b.color, status: 'ride', t: now, pos: [ll[0], ll[1], null, 6, b.wait > 0 ? 0 : b.w.speed, null], track: b.track.slice(), demo: true });
+      S.friends.set(b.id, { id: b.id, name: b.name, color: b.color, status: 'ride', t: now, pos: [ll[0], ll[1], null, 6, b.wait > 0 ? 0 : b.w.speed, null], track: b.track.slice(), act: 'ski', demo: true });
     }
     tick();
   };
@@ -304,6 +430,7 @@ function distTo(f) { return S.myPos ? haversine([S.myPos[0], S.myPos[1]], [f.pos
 
 let lastFull = 0;
 function tick(force) {
+  if (document.hidden) return;   // nothing to draw in the background: save CPU
   const now = Date.now();
   const fr = visibleFriends();
   for (const f of fr) S.preds.set(f.id, predict(S.net, f, now));
@@ -398,23 +525,28 @@ function renderSheet(fr, force) {
   document.documentElement.style.setProperty('--sheet-h', sheetH() + 'px');
 }
 
-function statusTag(s) { if (s === 'wait') return '<span class="tag wait">czeka</span>'; if (s === 'hut') return '<span class="tag">schronisko</span>'; if (s === 'done') return '<span class="tag">koniec</span>'; return ''; }
+function statusTag(s, act) {
+  if (act === 'pre') return '<span class="tag">przed jazdą</span>';
+  if (act === 'off') return '<span class="tag">poza stokiem</span>';
+  if (act === 'done') return '<span class="tag">koniec</span>';
+  if (s === 'wait') return '<span class="tag wait">czeka</span>'; if (s === 'hut') return '<span class="tag">schronisko</span>'; if (s === 'done') return '<span class="tag">koniec</span>'; return ''; }
 
 function listHtml(fr) {
   const my = S.me?.status || 'ride';
   const status = `<div class="statusbar" role="group" aria-label="Mój status">${STATUSES.map(([k, l]) => `<button data-status="${k}" class="${my === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  fr.sort((a, b) => (distTo(a) ?? 1e9) - (distTo(b) ?? 1e9));
+  const away = f => (f.act === 'pre' || f.act === 'done') ? 1 : 0;
+  fr.sort((a, b) => away(a) - away(b) || (distTo(a) ?? 1e9) - (distTo(b) ?? 1e9));
   let rows = fr.map(f => {
     const p = S.preds.get(f.id) || {}, d = distTo(f), stale = p.age > 180;
     const brg = S.myPos ? bearing([S.myPos[0], S.myPos[1]], [f.pos[0], f.pos[1]]) : 0;
     return `<button class="row${S.selected === f.id ? ' sel' : ''}" data-id="${esc(f.id)}">
       <div class="av" style="background:${f.color};color:${f.color}"><span style="color:#fff">${esc(initials(f.name))}</span></div>
-      <div style="min-width:0"><div class="nm"><b>${esc(f.name)}</b>${statusTag(f.status)}${f.demo ? '<span class="tag">demo</span>' : ''}${stale ? '<span class="tag stale">stare</span>' : ''}</div>
+      <div style="min-width:0"><div class="nm"><b>${esc(f.name)}</b>${statusTag(f.status, f.act)}${f.demo ? '<span class="tag">demo</span>' : ''}${stale ? '<span class="tag stale">stare</span>' : ''}</div>
       <div class="st">${esc(p.text || '')}</div></div>
       <div class="rt">${d != null ? `<div class="d">${arrowSvg(brg)} ${fmtDist(d)}</div>` : ''}<div class="ago">${agoTxt(f.t)}</div></div></button>`;
   }).join('');
   if (!fr.length) rows = `<div class="empty">Nikogo jeszcze nie widać. Wyślij znajomym link do aplikacji i kod grupy <b>${esc(S.me?.group || '')}</b>. Pojawią się tu, gdy włączą aplikację na stoku.<br><br><button class="btn" data-act="demo">Pokaż demo z symulowanymi znajomymi</button></div>`;
-  return `<h2>Ekipa <span class="count">${fr.length}</span>${S.myPos ? '' : '<span class="small" style="text-transform:none;letter-spacing:0;font-family:var(--body)">· brak Twojej pozycji</span>'}</h2>${status}<div class="list">${rows}</div>`;
+  return `<h2>Ekipa <span class="count">${fr.length}</span><span class="small" style="text-transform:none;letter-spacing:0;font-family:var(--body)">· ${S.myPos ? `Ty: ${ACT_PL[S.act]}${S.me?.share === false ? ' · ukryty' : ''}` : 'brak Twojej pozycji'}</span></h2>${status}<div class="list">${rows}</div>`;
 }
 
 function detailHtml(f) {
@@ -436,7 +568,7 @@ function detailHtml(f) {
   }
   return `<div class="detail">
     <div class="dhead"><div class="av" style="background:${f.color};color:${f.color}"><span style="color:#fff">${esc(initials(f.name))}</span></div>
-      <div class="t"><b>${esc(f.name)}</b><span>${d != null ? fmtDist(d) + ' od Ciebie · ' : ''}${agoTxt(f.t)}${p.m?.spd > 1 ? ' · ' + kmh(p.m.spd) : ''}</span></div>
+      <div class="t"><b>${esc(f.name)}</b>${f.full && f.full !== f.name ? `<span style="display:block">${esc(f.full)}</span>` : ''}<span>${d != null ? fmtDist(d) + ' od Ciebie · ' : ''}${agoTxt(f.t)}${p.m?.spd > 1 ? ' · ' + kmh(p.m.spd) : ''}</span></div>
       <button class="close" data-act="back" aria-label="Wróć do listy">×</button></div>
     <div class="box"><h3>Gdzie jest i dokąd jedzie</h3><div class="big" style="font-size:18px">${esc(p.text || '–')}</div>
       ${opts ? `<div class="small" style="margin-top:8px">Potem może pojechać:</div><div class="opts">${opts}</div>` : ''}</div>
@@ -497,12 +629,14 @@ function openSetup() {
   $('#inGroup').value = fromLink || genCode();
   $('#btnGen').onclick = () => { $('#inGroup').value = genCode(); };
   $('#setup').hidden = false;
-  if (!NATIVE) setTimeout(() => $('#inName').focus(), 50);
+  if (!NATIVE) setTimeout(() => $('#inNick').focus(), 50);
   $('#setupForm').onsubmit = async e => {
     e.preventDefault();
-    const name = $('#inName').value.trim(), group = $('#inGroup').value.trim().toLowerCase();
-    if (!name || group.length < 4) { toast('Podaj imię i kod grupy (min. 4 znaki)'); return; }
-    S.me = { id: crypto.randomUUID ? crypto.randomUUID() : hex(crypto.getRandomValues(new Uint8Array(16))), name, color, group, status: 'ride', share: true, wake: true, demo: false };
+    const nick = $('#inNick').value.trim(), first = $('#inFirst').value.trim(), last = $('#inLast').value.trim();
+    const group = $('#inGroup').value.trim().toLowerCase();
+    if (!nick && !first) { toast('Wpisz ksywkę albo imię'); $('#inNick').focus(); return; }
+    if (group.length < 4) { toast('Kod grupy musi mieć co najmniej 4 znaki'); return; }
+    S.me = { id: crypto.randomUUID ? crypto.randomUUID() : hex(crypto.getRandomValues(new Uint8Array(16))), nick, first, last, color, group, status: 'ride', share: true, wake: true, demo: false };
     saveMe();
     $('#setup').hidden = true;
     await start();
@@ -511,13 +645,18 @@ function openSetup() {
 
 function openSettings() {
   let color = S.me.color;
-  $('#stName').value = S.me.name;
+  $('#stNick').value = S.me.nick || ''; $('#stFirst').value = S.me.first || ''; $('#stLast').value = S.me.last || '';
+  $('#stEco').checked = !!S.me.eco;
+  renderBattery(); sampleBattery(true).then(renderBattery);
   colorPicker($('#stColors'), color, c => { color = c; });
   $('#stGroup').textContent = S.me.group;
   $('#stWake').checked = !!S.me.wake; $('#stShare').checked = S.me.share !== false; $('#stDemo').checked = !!S.me.demo;
   $('#settings').hidden = false;
   $('#btnSave').onclick = () => {
-    const n = $('#stName').value.trim(); if (n) S.me.name = n.slice(0, 16);
+    const nick = $('#stNick').value.trim(), first = $('#stFirst').value.trim();
+    if (!nick && !first) { toast('Wpisz ksywkę albo imię'); return; }
+    S.me.nick = nick; S.me.first = first; S.me.last = $('#stLast').value.trim(); delete S.me.name;
+    S.me.eco = $('#stEco').checked; setGpsMode(true);
     S.me.color = color; S.me.wake = $('#stWake').checked;
     const share = $('#stShare').checked; if (!share && S.me.share !== false) clearMine(); S.me.share = share;
     const demo = $('#stDemo').checked, modeChanged = demo !== !!S.me.demo; S.me.demo = demo;
@@ -526,6 +665,16 @@ function openSettings() {
     if (modeChanged) applyMode();
     tick(true); toast('Zapisano');
   };
+}
+function renderBattery() {
+  const el = $('#stBatt');
+  const mode = `Tryb GPS teraz: <b>${MODE_PL[S.gpsMode]}</b> · Ty: ${ACT_PL[S.act]}.`;
+  if (!NATIVE) { el.innerHTML = mode + '<br>Pomiar zużycia baterii działa w aplikacji na iPhone.'; return; }
+  const b = S.batt, r = batteryRate();
+  const lvl = b && b.level >= 0 ? `Bateria: ${Math.round(b.level * 100)}%${b.state === 'charging' ? ' (ładuje się)' : ''}${b.lowPower ? ' · tryb niskiego zużycia' : ''}.` : '';
+  const rate = r ? `Zużycie z aplikacją: <b>ok. ${r.perHour.toFixed(1).replace('.', ',')}%/h</b> (pomiar z ${fmtMin(r.hours * 3600)}).` : 'Zużycie policzę po ok. 30 min bez ładowania.';
+  const auth = b?.auth === 'whenInUse' ? '<br>Lokalizacja: „Gdy używam”. Ustaw „Zawsze”, żeby działało w kieszeni.' : b?.auth === 'always' ? '<br>Lokalizacja: „Zawsze”.' : '';
+  el.innerHTML = `${mode}<br>${lvl} ${rate}${auth}`;
 }
 $('#btnSettings').onclick = openSettings;
 $('#settings').addEventListener('click', e => { if (e.target.id === 'settings' || e.target.closest('[data-close]')) $('#settings').hidden = true; });
