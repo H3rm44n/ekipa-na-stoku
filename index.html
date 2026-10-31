@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Ekipa na Stoku</title>
+<meta name="theme-color" content="#0f2a44">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ekipa">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* Layout: full-bleed map, signage-style top bar, bottom sheet with the crew list */
+:root{
+  --ink:#0f2a44; --ink-2:#3b5670; --snow:#f4f8fb; --card:#ffffff; --line:#d7e2ec;
+  --accent:#ff6b00; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --muted:#7b8fa3;
+  --easy:#1d6fe0; --inter:#d42a2a; --adv:#111111; --free:#e08a00;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --shadow:0 6px 24px rgba(15,42,68,.18);
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root{
+  --ink:#e8f0f7; --ink-2:#a9bccd; --snow:#0c1824; --card:#13253a; --line:#24405c; --muted:#7f97ad;
+  --adv:#e8e8e8; --shadow:0 6px 24px rgba(0,0,0,.5); color-scheme:dark }}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:15px/1.4 var(--body);color:var(--ink);background:var(--snow);overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer}
+#map{position:fixed;inset:0;background:#dfe8ee}
+.leaflet-control-attribution{font-size:9px;opacity:.75;margin-bottom:calc(var(--sheet-h,140px) + var(--sab)) !important}
+
+.topbar{position:fixed;left:0;right:0;top:0;z-index:1000;display:flex;align-items:center;gap:8px;
+  padding:calc(var(--sat) + 8px) max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));
+  background:linear-gradient(var(--snow) 55%,transparent);pointer-events:none}
+.topbar>*{pointer-events:auto}
+.brand{font:700 22px/1 var(--display);letter-spacing:.02em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.brand i{display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--accent);transform:rotate(45deg)}
+.spacer{flex:1}
+.chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:17px;border:1px solid var(--line);
+  background:var(--card);box-shadow:var(--shadow);font-weight:600;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--ok)} .dot.half{background:var(--warn)} .dot.off{background:var(--bad)}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow);
+  display:grid;place-items:center}
+.iconbtn svg{width:20px;height:20px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn.active{background:var(--ink)} .iconbtn.active svg{stroke:var(--snow)}
+
+.fabs{position:fixed;right:max(12px,env(safe-area-inset-right));bottom:calc(var(--sheet-h,140px) + var(--sab) + 14px);z-index:1000;display:flex;flex-direction:column;gap:10px;transition:bottom .25s}
+
+.banner{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--sat) + 58px);z-index:1001;max-width:calc(100% - 24px);
+  background:var(--ink);color:var(--snow);padding:8px 14px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:var(--shadow);text-align:center}
+.banner button{background:none;border:0;color:var(--accent);font-weight:700;padding:0 0 0 8px}
+
+/* bottom sheet */
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:1002;background:var(--card);border-radius:18px 18px 0 0;box-shadow:0 -6px 30px rgba(15,42,68,.22);
+  padding:0 max(14px,env(safe-area-inset-right)) calc(var(--sab) + 10px) max(14px,env(safe-area-inset-left));max-height:62vh;display:flex;flex-direction:column}
+.handle{display:flex;justify-content:center;padding:8px 0 4px;border:0;background:none;width:100%}
+.handle span{width:42px;height:5px;border-radius:3px;background:var(--line)}
+.sheet h2{font:700 15px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:4px 0 8px;display:flex;align-items:center;gap:8px}
+.sheet h2 .count{background:var(--snow);border:1px solid var(--line);border-radius:10px;padding:2px 8px;font-size:12px;color:var(--ink)}
+.list{overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:2px;min-height:0}
+.sheet:not(.open) .list{max-height:152px}
+.row{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;padding:8px 6px;border-radius:12px;border:0;background:none;text-align:left;width:100%}
+.row:hover,.row.sel{background:var(--snow)}
+.av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font:700 16px/1 var(--display);border:3px solid var(--card);box-shadow:0 0 0 2px currentColor}
+.row .nm{font-weight:600;display:flex;gap:6px;align-items:center;min-width:0}
+.row .nm b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .st{font-size:13px;color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.row .rt{text-align:right;font-variant-numeric:tabular-nums}
+.row .rt .d{font:700 18px/1 var(--display)}
+.row .rt .ago{font-size:11px;color:var(--muted)}
+.arrow{display:inline-block;width:14px;height:14px;vertical-align:-2px}
+.tag{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:var(--snow);border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+.tag.wait{background:#fff3e0;border-color:#ffcc80;color:#9a4b00}
+.tag.stale{color:var(--muted)}
+.empty{padding:14px 6px;color:var(--ink-2);font-size:14px}
+.empty b{color:var(--ink)}
+
+/* detail */
+.detail{display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:0;padding-bottom:4px}
+.dhead{display:flex;align-items:center;gap:10px}
+.dhead .t{flex:1;min-width:0}
+.dhead .t b{font:700 22px/1.05 var(--display);display:block}
+.dhead .t span{font-size:13px;color:var(--ink-2)}
+.close{border:1px solid var(--line);background:var(--snow);border-radius:10px;width:36px;height:36px;font-size:18px}
+.box{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--snow)}
+.box h3{margin:0 0 6px;font:700 13px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.big{font:700 20px/1.15 var(--display)}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.steps{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.steps li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:14px}
+.steps .meta{font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pb{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:22px;padding:0 6px;border-radius:6px;color:#fff;font:700 12px/1 var(--display);letter-spacing:.04em}
+.pb.easy{background:var(--easy)} .pb.inter{background:var(--inter)} .pb.adv{background:#111;color:#fff} .pb.free{background:var(--free)}
+.pb.lift{background:#4a5a6a} .pb.walk{background:transparent;color:var(--ink-2);border:1px dashed var(--muted)} .pb.conn{background:#7b8fa3}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{height:42px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.dark{background:var(--ink);border-color:var(--ink);color:var(--snow)}
+.small{font-size:12px;color:var(--muted)}
+
+/* status picker */
+.statusbar{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.statusbar button{flex:none;height:32px;padding:0 12px;border-radius:16px;border:1px solid var(--line);background:var(--snow);font-size:13px;font-weight:600}
+.statusbar button.on{background:var(--ink);color:var(--snow);border-color:var(--ink)}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:2000;background:rgba(10,25,40,.55);display:flex;align-items:flex-end;justify-content:center}
+.modal[hidden]{display:none}
+.panel{background:var(--card);width:100%;max-width:520px;max-height:92vh;overflow-y:auto;border-radius:20px 20px 0 0;
+  padding:20px max(18px,env(safe-area-inset-right)) calc(var(--sab) + 18px) max(18px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:14px}
+@media (min-width:600px){.modal{align-items:center}.panel{border-radius:20px}}
+.panel h1{font:700 30px/1 var(--display);text-transform:uppercase;margin:0;letter-spacing:.01em}
+.panel p{margin:0;color:var(--ink-2)}
+label{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:13px}
+input[type=text]{height:46px;border-radius:12px;border:1px solid var(--line);background:var(--snow);padding:0 12px;font:500 16px var(--body);color:var(--ink)}
+input:focus,button:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:1px}
+.colors{display:flex;gap:8px;flex-wrap:wrap}
+.colors button{width:36px;height:36px;border-radius:50%;border:3px solid var(--card);box-shadow:0 0 0 1px var(--line)}
+.colors button.on{box-shadow:0 0 0 3px var(--ink)}
+.rowflex{display:flex;gap:8px}
+.rowflex input{flex:1;min-width:0}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:500;font-size:14px;flex-direction:row}
+.toggle input{width:22px;height:22px;accent-color:var(--accent)}
+.hr{height:1px;background:var(--line)}
+.note{font-size:12px;color:var(--muted);line-height:1.45}
+
+/* map markers */
+.fm{position:relative;width:38px;height:38px}
+.fm .c{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;color:#fff;font:700 15px/1 'Barlow Condensed',sans-serif;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.fm .lbl{position:absolute;left:50%;top:40px;transform:translateX(-50%);background:rgba(15,42,68,.88);color:#fff;font:600 11px/1 Barlow,sans-serif;padding:3px 6px;border-radius:6px;white-space:nowrap}
+.fm.stale .c{filter:grayscale(.8);opacity:.6}
+.fm.sel .c{box-shadow:0 0 0 4px #ff6b00,0 2px 8px rgba(0,0,0,.4)}
+.fm .hd{position:absolute;left:50%;top:50%;width:0;height:0}
+.fm .hd::before{content:"";position:absolute;left:-7px;top:-33px;border:7px solid transparent;border-bottom:11px solid #fff;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
+.fm .pulse{position:absolute;inset:-6px;border-radius:50%;border:2px solid currentColor;animation:pl 2s infinite}
+@keyframes pl{from{transform:scale(.8);opacity:.9}to{transform:scale(1.5);opacity:0}}
+.me{width:22px;height:22px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 2px rgba(26,115,232,.35),0 2px 6px rgba(0,0,0,.4)}
+.meet{width:30px;height:30px;border-radius:8px;background:#ff6b00;border:3px solid #fff;transform:rotate(45deg);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.toast{position:fixed;left:50%;bottom:calc(var(--sheet-h,140px) + var(--sab) + 20px);transform:translateX(-50%);z-index:3000;background:var(--ink);color:var(--snow);padding:10px 16px;border-radius:12px;font-weight:600;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+.leaflet-popup-content{font:14px/1.35 var(--body);margin:10px 12px}
+@media (prefers-reduced-motion:reduce){.fm .pulse{animation:none;display:none}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<header class="topbar">
+  <div class="brand"><i></i>Ekipa</div>
+  <div class="spacer"></div>
+  <button class="chip" id="connChip" title="Połączenie"><span class="dot" id="connDot"></span><span id="connTxt">…</span></button>
+  <button class="iconbtn" id="btnSettings" aria-label="Ustawienia"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+
+<div class="fabs">
+  <button class="iconbtn" id="btnLayers" aria-label="Zmień podkład mapy"><svg viewBox="0 0 24 24"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 16 10 6 10-6"/></svg></button>
+  <button class="iconbtn" id="btnFit" aria-label="Pokaż wszystkich"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <button class="iconbtn" id="btnMe" aria-label="Moja pozycja"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+</div>
+
+<section class="sheet" id="sheet">
+  <button class="handle" id="handle" aria-label="Rozwiń listę"><span></span></button>
+  <div id="sheetBody"></div>
+</section>
+
+<div class="modal" id="setup" hidden>
+  <form class="panel" id="setupForm">
+    <h1>Ekipa na stoku</h1>
+    <p>Widzisz na mapie stoku, gdzie są znajomi, dokąd jadą i jak do nich dojechać.</p>
+    <label for="inName">Twoje imię
+      <input type="text" id="inName" maxlength="16" autocomplete="given-name" placeholder="np. Kuba" required>
+    </label>
+    <div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Kolor na mapie</div><div class="colors" id="inColors"></div></div>
+    <label for="inGroup">Kod grupy (taki sam u wszystkich)
+      <div class="rowflex"><input type="text" id="inGroup" maxlength="40" autocapitalize="none" autocomplete="off" spellcheck="false" required>
+      <button type="button" class="btn" id="btnGen">Losuj</button></div>
+    </label>
+    <p class="note">Kod grupy szyfruje pozycje. Kto go nie zna, nie zobaczy, gdzie jesteście. Wyślij go znajomym razem z linkiem do aplikacji.</p>
+    <button class="btn primary" type="submit">Dołącz do ekipy</button>
+  </form>
+</div>
+
+<div class="modal" id="settings" hidden>
+  <div class="panel">
+    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase">Ustawienia</b></div><button class="close" data-close aria-label="Zamknij">×</button></div>
+    <label for="stName">Imię<input type="text" id="stName" maxlength="16"></label>
+    <div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Kolor</div><div class="colors" id="stColors"></div></div>
+    <div class="box"><h3>Kod grupy</h3><div class="rowflex" style="align-items:center"><code id="stGroup" style="flex:1;font-size:16px;font-weight:600;user-select:all;word-break:break-all"></code><button class="btn" id="btnCopy">Kopiuj</button></div>
+      <p class="note" style="margin-top:6px">Znajomi wpisują ten sam kod po otwarciu aplikacji.</p></div>
+    <div class="hr"></div>
+    <label class="toggle" for="stWake">Nie wygaszaj ekranu (lepsze śledzenie)<input type="checkbox" id="stWake"></label>
+    <label class="toggle" for="stShare">Udostępniaj moją pozycję<input type="checkbox" id="stShare"></label>
+    <label class="toggle" for="stDemo">Tryb demo (symulowani znajomi)<input type="checkbox" id="stDemo"></label>
+    <div class="hr"></div>
+    <div class="box"><h3>Mapa tras</h3><p class="small" id="stNet">–</p>
+      <div class="actions" style="margin-top:8px"><button class="btn" id="btnNetResort">Madonna di Campiglio</button><button class="btn" id="btnNetHere">Ośrodek w widoku mapy</button></div></div>
+    <div class="actions"><button class="btn primary" id="btnSave">Zapisz</button><button class="btn" id="btnLeave" style="color:var(--bad)">Opuść grupę</button></div>
+    <p class="note">Pozycje przesyłane są zaszyfrowane (AES‑GCM, klucz z kodu grupy) przez publiczne serwery MQTT HiveMQ i EMQX. Trasy i wyciągi: © OpenStreetMap. Gdy aplikacja jest w tle lub ekran zgaszony, telefon może przestać wysyłać pozycję.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script src="net.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
