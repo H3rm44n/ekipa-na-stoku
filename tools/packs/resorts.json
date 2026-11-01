@@ -1,6 +1,66 @@
 [
-  { "id": "campiglio", "name": "Madonna di Campiglio · Pinzolo · Folgarida-Marilleva", "country": "IT",
-    "center": [46.2297, 10.8263], "bbox": [46.13, 10.68, 46.36, 10.97], "dem": "N46E010" },
-  { "id": "tonale", "name": "Pontedilegno-Tonale", "country": "IT",
-    "center": [46.2588, 10.5838], "bbox": [46.17, 10.40, 46.34, 10.68], "dem": "N46E010" }
+  {
+    "id": "campiglio",
+    "name": "Madonna di Campiglio · Pinzolo · Folgarida-Marilleva",
+    "country": "IT",
+    "center": [
+      46.2297,
+      10.8263
+    ],
+    "bbox": [
+      46.13,
+      10.68,
+      46.36,
+      10.97
+    ],
+    "dem": "N46E010"
+  },
+  {
+    "id": "tonale",
+    "name": "Pontedilegno-Tonale",
+    "country": "IT",
+    "center": [
+      46.2588,
+      10.5838
+    ],
+    "bbox": [
+      46.17,
+      10.4,
+      46.34,
+      10.68
+    ],
+    "dem": "N46E010"
+  },
+  {
+    "id": "pejo",
+    "name": "Pejo 3000",
+    "country": "IT",
+    "center": [
+      46.364,
+      10.664
+    ],
+    "bbox": [
+      46.33,
+      10.6,
+      46.41,
+      10.72
+    ],
+    "dem": "N46E010"
+  },
+  {
+    "id": "paganella",
+    "name": "Paganella · Andalo · Fai della Paganella",
+    "country": "IT",
+    "center": [
+      46.16,
+      11.03
+    ],
+    "bbox": [
+      46.12,
+      10.95,
+      46.21,
+      11.09
+    ],
+    "dem": "N46E010,N46E011"
+  }
 ]

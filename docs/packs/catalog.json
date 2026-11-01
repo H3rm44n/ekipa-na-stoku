@@ -42,5 +42,49 @@
   },
   "size": 8435611,
   "version": "52a88fde5ba3"
+ },
+ {
+  "id": "pejo",
+  "name": "Pejo 3000",
+  "country": "IT",
+  "center": [
+   46.364,
+   10.664
+  ],
+  "bbox": [
+   46.33,
+   10.6,
+   46.41,
+   10.72
+  ],
+  "files": {
+   "data": "pejo.json",
+   "base": "pejo-base.pmtiles",
+   "dem": "pejo-dem.pmtiles"
+  },
+  "size": 5224043,
+  "version": "aeaa9d44fed7"
+ },
+ {
+  "id": "paganella",
+  "name": "Paganella · Andalo · Fai della Paganella",
+  "country": "IT",
+  "center": [
+   46.16,
+   11.03
+  ],
+  "bbox": [
+   46.12,
+   10.95,
+   46.21,
+   11.09
+  ],
+  "files": {
+   "data": "paganella.json",
+   "base": "paganella-base.pmtiles",
+   "dem": "paganella-dem.pmtiles"
+  },
+  "size": 5671623,
+  "version": "6aa3e570626b"
  }
 ]

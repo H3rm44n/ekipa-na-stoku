@@ -34,8 +34,11 @@ async function loadCatalog() {
 const resortById = id => CATALOG?.find(r => r.id === id) || null;
 const fileKey = (r, kind) => `${r.id}:${kind}:${r.version}`;
 // Inside a resort's area (with a margin), used to suggest switching.
+// Areas of neighbouring resorts can overlap (Pejo / Marilleva): the closest resort centre wins.
 function resortAt(lat, lon, margin = 0.02) {
-  return CATALOG?.find(r => lat > r.bbox[0] - margin && lat < r.bbox[2] + margin && lon > r.bbox[1] - margin && lon < r.bbox[3] + margin) || null;
+  const hits = (CATALOG || []).filter(r => lat > r.bbox[0] - margin && lat < r.bbox[2] + margin && lon > r.bbox[1] - margin && lon < r.bbox[3] + margin);
+  const d = r => (r.center[0] - lat) ** 2 + ((r.center[1] - lon) * Math.cos(lat * Math.PI / 180)) ** 2;
+  return hits.sort((a, b) => d(a) - d(b))[0] || null;
 }
 
 async function packFile(r, kind, onBytes) {

@@ -1,5 +1,5 @@
 """Copernicus GLO-30 GeoTIFF (1x1 degree) -> Terrarium-encoded PNG tiles in a PMTiles archive.
-usage: dem.py DEM.tif OUT.pmtiles west south east north minzoom maxzoom"""
+usage: dem.py DEM.tif[,DEM2.tif] OUT.pmtiles west south east north minzoom maxzoom"""
 import sys, math, io
 import numpy as np, tifffile
 from PIL import Image
@@ -7,18 +7,27 @@ from pmtiles.writer import Writer
 from pmtiles.tile import zxy_to_tileid, TileType, Compression
 tif, out = sys.argv[1], sys.argv[2]
 W, S, E, N = map(float, sys.argv[3:7]); Z0, Z1 = int(sys.argv[7]), int(sys.argv[8])
-with tifffile.TiffFile(tif) as t:
-    page = t.pages[0]; dem = page.asarray().astype(np.float32)
-    sx, sy = page.tags[33550].value[:2]; lon0, lat0 = page.tags[33922].value[3:5]
-dem[dem < -500] = 0
-H, Wd = dem.shape
+# One or more Copernicus 1x1 degree tiles (comma-separated); each point is sampled from the tile that contains it.
+dems = []
+for path in tif.split(','):
+    with tifffile.TiffFile(path) as t:
+        page = t.pages[0]; d = page.asarray().astype(np.float32)
+        sx, sy = page.tags[33550].value[:2]; lon0, lat0 = page.tags[33922].value[3:5]
+    d[d < -500] = 0
+    dems.append((d, sx, sy, lon0, lat0))
 def sample(lon, lat):
-    # bilinear sample at pixel centres
-    px = (lon - lon0) / sx - 0.5; py = (lat0 - lat) / sy - 0.5
-    x0 = np.clip(np.floor(px).astype(int), 0, Wd - 2); y0 = np.clip(np.floor(py).astype(int), 0, H - 2)
-    fx = np.clip(px - x0, 0, 1); fy = np.clip(py - y0, 0, 1)
-    a = dem[y0, x0]; b = dem[y0, x0 + 1]; c = dem[y0 + 1, x0]; d = dem[y0 + 1, x0 + 1]
-    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+    out = np.zeros(lon.shape, np.float32)
+    for dem, sx, sy, lon0, lat0 in dems:
+        H, Wd = dem.shape
+        inside = (lon >= lon0) & (lon < lon0 + Wd * sx) & (lat <= lat0) & (lat > lat0 - H * sy)
+        if not inside.any(): continue
+        px = (lon - lon0) / sx - 0.5; py = (lat0 - lat) / sy - 0.5
+        x0 = np.clip(np.floor(px).astype(int), 0, Wd - 2); y0 = np.clip(np.floor(py).astype(int), 0, H - 2)
+        fx = np.clip(px - x0, 0, 1); fy = np.clip(py - y0, 0, 1)
+        a = dem[y0, x0]; b = dem[y0, x0 + 1]; c = dem[y0 + 1, x0]; d = dem[y0 + 1, x0 + 1]
+        v = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+        out[inside] = v[inside]
+    return out
 def x_of(lon, z): return int((lon + 180) / 360 * 2 ** z)
 def y_of(lat, z): lr = math.radians(lat); return int((1 - math.log(math.tan(lr) + 1 / math.cos(lr)) / math.pi) / 2 * 2 ** z)
 tiles = []
