@@ -626,10 +626,7 @@ function statusTag(s, act) {
   if (s === 'wait') return '<span class="tag wait">czeka</span>'; if (s === 'hut') return '<span class="tag">schronisko</span>'; if (s === 'done') return '<span class="tag">koniec</span>'; return ''; }
 
 function listHtml(fr) {
-  // My status is one small pill; the choices open only when tapped.
-  const my = S.me?.status || 'ride', myL = (STATUSES.find(x => x[0] === my) || STATUSES[0])[1];
-  const pill = `<button class="stpill ${my}" data-act="statusmenu" aria-expanded="${!!S.statusOpen}">${esc(myL)} <span aria-hidden="true">▾</span></button>`;
-  const status = S.statusOpen ? `<div class="statusbar" role="group" aria-label="Mój status">${STATUSES.map(([k, l]) => `<button data-status="${k}" class="${my === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
+  const status = '';
   const away = f => (f.act === 'pre' || f.act === 'done') ? 1 : 0;
   fr.sort((a, b) => away(a) - away(b) || (distTo(a) ?? 1e9) - (distTo(b) ?? 1e9));
   let rows = fr.map(f => {
@@ -645,7 +642,7 @@ function listHtml(fr) {
   const tabs = `<div class="tabs" role="tablist"><button data-act="tab" data-tab="crew" class="${S.tab !== 'rank' ? 'on' : ''}">Ekipa <span class="count">${fr.length}</span></button><button data-act="tab" data-tab="rank" class="${S.tab === 'rank' ? 'on' : ''}">Ranking dnia</button></div>`;
   if (S.tab === 'rank' && HOOK.rank) return tabs + `<div class="list">${HOOK.rank()}</div>`;
   const top = HOOK.top.map(h => { try { return h(); } catch (err) { console.error(err); return ''; } }).join('');
-  return tabs + `<h2 class="me-line">${pill}<span>${S.myPos ? `Ty: ${ACT_PL[S.act]}${S.me?.share === false ? ' · nie udostępniasz pozycji' : (S.me?.hideUntil || 0) > Date.now() ? ' · ukryty do ' + new Date(S.me.hideUntil).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : ''}` : 'Brak Twojej pozycji'}</span></h2>${status}<div class="list">${top}${rows}${HOOK.listEnd?.() || ''}</div>`;
+  return tabs + `<h2 class="me-line"><span>${S.myPos ? `Ty: ${ACT_PL[S.act]}${S.me?.share === false ? ' · nie udostępniasz pozycji' : (S.me?.hideUntil || 0) > Date.now() ? ' · ukryty do ' + new Date(S.me.hideUntil).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : ''}` : 'Brak Twojej pozycji'}</span></h2>${status}<div class="list">${top}${rows}${HOOK.listEnd?.() || ''}</div>`;
 }
 
 function detailHtml(f) {
@@ -693,15 +690,32 @@ function nodeLabel(n) {
 $('#sheetBody').addEventListener('click', e => {
   const row = e.target.closest('[data-id]'); if (row) { select(row.dataset.id); return; }
   const st = e.target.closest('[data-status]');
-  if (st) { S.me.status = st.dataset.status; S.statusOpen = false; saveMe(); publish(true); tick(true); toast('Status: ' + st.textContent); return; }
+  if (st) { setStatus(st.dataset.status); return; }
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (act === 'back') deselect();
   else if (act === 'center') { const f = S.friends.get(S.selected); if (f) { S.follow = false; map.setView([f.pos[0], f.pos[1]], 16); } }
   else if (act === 'demo') { S.me.demo = true; saveMe(); applyMode(); }
-  else if (act === 'statusmenu') { S.statusOpen = !S.statusOpen; tick(true); }
   else if (act === 'tab') { S.tab = e.target.closest('[data-tab]').dataset.tab; tick(true); }
   else if (HOOK.act[act]) HOOK.act[act](e.target.closest('[data-act]'));
 });
+// My status lives in the right-hand column under SOS; the choices open in a small menu.
+function setStatus(k) {
+  S.me.status = k; saveMe(); publish(true);
+  $('#stMenu').hidden = true; renderStatusBtn(); tick(true);
+  toast('Status: ' + (STATUSES.find(x => x[0] === k) || STATUSES[0])[1]);
+}
+function renderStatusBtn() {
+  const my = S.me?.status || 'ride';
+  $('#stLabel').textContent = (STATUSES.find(x => x[0] === my) || STATUSES[0])[1];
+  $('#btnStatus').className = 'rbtn st ' + my;
+  $('#btnStatus').setAttribute('aria-expanded', String(!$('#stMenu').hidden));
+  $('#stMenu').innerHTML = STATUSES.map(([k, l]) => `<button role="menuitem" data-st="${k}" class="${my === k ? 'on' : ''}">${l}</button>`).join('');
+}
+$('#btnStatus').onclick = () => { $('#stMenu').hidden = !$('#stMenu').hidden; renderStatusBtn(); };
+$('#stMenu').onclick = e => { const b = e.target.closest('[data-st]'); if (b) setStatus(b.dataset.st); };
+map.on('click', () => { if (!$('#stMenu').hidden) { $('#stMenu').hidden = true; renderStatusBtn(); } });
+if (S.me) renderStatusBtn();
+
 // Drag the handle to make the sheet taller or shorter (the size is remembered); a tap toggles it as before.
 const sheetEl = $('#sheet'), handleEl = $('#handle');
 let sheetDrag = null;
@@ -836,6 +850,7 @@ function applyMode() {
 }
 
 async function start() {
+  renderStatusBtn();
   G = await deriveGroup(S.me.group);
   connect();
   applyWake();

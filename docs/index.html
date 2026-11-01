@@ -54,7 +54,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 
 .fabs{position:fixed;right:max(12px,env(safe-area-inset-right));bottom:calc(var(--sheet-h,140px) + var(--sab) + 14px);z-index:1000;display:flex;flex-direction:column;gap:10px;transition:bottom .25s}
 
-.banner{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--sat) + 58px);z-index:1001;max-width:calc(100% - 24px);
+.banner{position:fixed;left:max(12px,env(safe-area-inset-left));top:calc(var(--sat) + 58px);z-index:1001;max-width:calc(100% - 150px);
   background:var(--ink);color:var(--snow);padding:8px 14px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:var(--shadow);text-align:center}
 .banner button{background:none;border:0;color:var(--accent);font-weight:700;padding:0 0 0 8px}
 
@@ -219,8 +219,22 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 .pn{min-width:0;display:flex;flex-direction:column}
 .pn span{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pd{font:700 16px/1 var(--display);font-variant-numeric:tabular-nums}
-/* SOS under the settings button */
-.sosfab{position:fixed;top:calc(var(--sat) + 58px);right:max(12px,env(safe-area-inset-right));z-index:1000;width:40px;height:40px;border-radius:12px;border:2px solid #fff;background:var(--bad);color:#fff;font:700 14px/1 var(--display);letter-spacing:.04em;box-shadow:var(--shadow)}
+/* right column under the settings button: SOS, chat, guide, my status */
+.rcol{position:fixed;top:calc(var(--sat) + 58px);right:max(12px,env(safe-area-inset-right));z-index:1001;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.rbtn{position:relative;height:38px;padding:0 11px;border-radius:12px;border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow);display:inline-flex;align-items:center;gap:6px;font:700 14px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--ink)}
+.rbtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linejoin:round}
+.rbtn .badge{position:absolute;top:-6px;right:-6px;margin:0}
+#btnNav{background:var(--accent);border-color:var(--accent);color:#fff}
+.rbtn.st{text-transform:none;letter-spacing:0;font:600 13px/1 var(--body)}
+.rbtn.st small{font-size:10px;opacity:.7}
+.rbtn.st.wait{background:#fff3e0;border-color:#ffcc80;color:#9a4b00}
+.rbtn.st.hut{background:#f3e8d8;border-color:#d8b98f;color:#6b4423}
+.rbtn.st.done{color:var(--ink-2)}
+.stmenu[hidden]{display:none}
+.stmenu{display:flex;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:var(--shadow)}
+.stmenu button{height:36px;padding:0 14px;border-radius:9px;border:0;background:none;text-align:right;font-weight:600;font-size:14px;color:var(--ink)}
+.stmenu button.on{background:var(--ink);color:var(--snow)}
+.sosfab{width:40px;height:40px;border-radius:12px;border:2px solid #fff;background:var(--bad);color:#fff;font:700 14px/1 var(--display);letter-spacing:.04em;box-shadow:var(--shadow)}
 .sosfab.on{animation:sosb 1s infinite}
 @keyframes sosb{50%{background:#7f1d1d}}
 /* my status pill */
@@ -234,7 +248,8 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 /* action bar: chat left, guide right */
 .actbar{flex-wrap:nowrap}
 .actbar .grow{flex:1}
-.btn .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-weight:700}
+.badge[hidden]{display:none}
+.badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-weight:700}
 .list>*{flex-shrink:0}
 .chatlast{cursor:pointer;font-size:13px;color:var(--ink-2);margin:-2px 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* chat */
@@ -286,7 +301,13 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
   <button class="iconbtn" id="btnSettings" aria-label="Ustawienia"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 </header>
 
-<button class="sosfab" id="btnSos" aria-label="SOS – alarm dla ekipy">SOS</button>
+<div class="rcol" id="rcol">
+  <button class="sosfab" id="btnSos" aria-label="SOS – alarm dla ekipy">SOS</button>
+  <button class="rbtn" id="btnChat" aria-label="Czat ekipy"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Czat<span class="badge" id="chatBadge" hidden></span></button>
+  <button class="rbtn" id="btnNav" aria-label="Prowadź do znajomego"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>Prowadź</button>
+  <button class="rbtn st" id="btnStatus" aria-haspopup="true" aria-expanded="false"><span id="stLabel">Jeżdżę</span> <small aria-hidden="true">▾</small></button>
+  <div class="stmenu" id="stMenu" role="menu" hidden></div>
+</div>
 
 <div class="banner" id="banner" hidden></div>
 

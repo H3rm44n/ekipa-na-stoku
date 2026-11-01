@@ -1,5 +1,5 @@
 // Offline shell + map tiles you have already seen (useful where the slope has weak signal).
-const SHELL = 'ekipa-shell-v7', TILES = 'ekipa-tiles-v1', MAX_TILES = 2500;
+const SHELL = 'ekipa-shell-v8', TILES = 'ekipa-tiles-v1', MAX_TILES = 2500;
 const ASSETS = ['./', 'index.html', 'app.js', 'net.js', 'stats.js', 'social.js', 'crew.js', 'history.js', 'manifest.webmanifest', 'icon.svg',
   'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/mqtt.min.js', 'vendor/capacitor.js'];
 

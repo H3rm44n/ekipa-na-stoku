@@ -308,6 +308,13 @@ $('#btnSos').onclick = () => {
   const l = $('#sheetBody .list'); if (l) l.scrollTop = 0;
 };
 HOOK.tick.push(() => $('#btnSos').classList.toggle('on', !!S.sos || visibleFriends().some(f => f.sos)));
+// "Prowadź" under SOS: the list of people to guide to, at the top of the sheet.
+$('#btnNav').onclick = () => {
+  if (!S.me) return;
+  S.selected = null; S.view = null; S.tab = 'crew'; S.sheetOpen = true; pickOpen = true;
+  tick(true);
+  const l = $('#sheetBody .list'); if (l) l.scrollTop = 0;
+};
 HOOK.act.sosyes = () => setSos(true);
 HOOK.act.sosno = () => { sosConfirm = false; tick(true); };
 HOOK.act.sosoff = () => setSos(false);
@@ -351,8 +358,7 @@ HOOK.friend.push(f => {
 /* ---------- cards above the list ---------- */
 HOOK.top.unshift(() => {
   const hidden = (S.me?.hideUntil || 0) > Date.now();
-  const unread = chatUnread();
-  const bar = `<div class="actbar"><button class="btn sm dark" data-act="chat">Czat${unread ? `<span class="badge">${unread}</span>` : ''}</button>${hidden ? `<button class="btn sm" data-act="unhide">Pokaż mnie</button>` : ''}<span class="grow"></span><button class="btn sm primary" data-act="navpick">Prowadź do…</button></div>`;
+  const bar = hidden ? `<div class="actbar"><span class="small">Jesteś ukryty na mapie znajomych</span><span class="grow"></span><button class="btn sm" data-act="unhide">Pokaż mnie</button></div>` : '';
   return sosCards() + navCard() + meetCards() + bar + chatPreview() + pickCard();
 });
 

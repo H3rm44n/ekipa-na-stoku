@@ -105,6 +105,8 @@ function chatPreview() {
   return `<div class="chatlast" data-act="chat"><b>${last.u === S.me.id ? 'Ty' : esc(last.n)}:</b> ${esc(last.x)} <span class="small">· ${agoTxt(last.t)}</span></div>`;
 }
 HOOK.act.chat = openChat;
+$('#btnChat').onclick = () => { if (S.me) openChat(); };
+HOOK.tick.push(() => { const n = chatUnread(), b = $('#chatBadge'); b.hidden = !n; b.textContent = n > 9 ? '9+' : n; });
 HOOK.act.qmsend = el => sendChat(el.dataset.x);
 HOOK.leave.push(() => pubTopic('c', S.me.id, null, true));
 
