@@ -1,0 +1,6 @@
+[
+  { "id": "campiglio", "name": "Madonna di Campiglio · Pinzolo · Folgarida-Marilleva", "country": "IT",
+    "center": [46.2297, 10.8263], "bbox": [46.13, 10.68, 46.36, 10.97], "dem": "N46E010" },
+  { "id": "tonale", "name": "Pontedilegno-Tonale", "country": "IT",
+    "center": [46.2588, 10.5838], "bbox": [46.17, 10.40, 46.34, 10.68], "dem": "N46E010" }
+]

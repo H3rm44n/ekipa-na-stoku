@@ -146,4 +146,5 @@ null,null,"Forbindelse","Indstillinger","SOS – alarm til holdet","Chat","Holde
 "Sted","f.eks. Rifugio Graffer","Tid","om 15 min","om 30 min","om 1 t","om 1,5 t",
 "Note","(valgfrit)","f.eks. frokost, vi tager et bord på terrassen","Send til holdet",
 "Holdets chat","Dagens beskeder, krypteret med gruppekoden","Skriv til holdet…","Send",
+"Skisportssteder","valgt","kort på telefonen · virker offline","{mb} MB at hente","Vælg","Slet kort","Henter kortet for {name} ({mb} MB)…","Kunne ikke hente kortet. Tjek forbindelsen.","Du er i {name}","Skift","Kort slettet: {name}",null,
 ];

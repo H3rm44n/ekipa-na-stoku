@@ -146,4 +146,5 @@ null,null,"Connexion","Réglages","SOS – alerte pour ton groupe","Chat","Chat 
 "Lieu","ex. Rifugio Graffer","Heure","dans 15 min","dans 30 min","dans 1 h","dans 1 h 30",
 "Note","(facultative)","ex. déjeuner, on prend une table en terrasse","Envoyer au groupe",
 "Chat du groupe","Messages du jour, chiffrés avec le code de groupe","Écris au groupe…","Envoyer",
+"Stations","sélectionnée","carte sur le téléphone · fonctionne hors ligne","{mb} Mo à télécharger","Choisir","Supprimer la carte","Téléchargement de la carte de {name} ({mb} Mo)…","Impossible de télécharger la carte de la station. Vérifie ta connexion.","Tu es à {name}","Changer","Carte supprimée : {name}",null,
 ];

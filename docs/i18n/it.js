@@ -146,4 +146,5 @@ null,null,"Connessione","Impostazioni","SOS – allarme per il gruppo","Chat","C
 "Luogo","es. Rifugio Graffer","Ora","tra 15 min","tra 30 min","tra 1 h","tra 1,5 h",
 "Nota","(facoltativa)","es. pranzo, prendiamo un tavolo in terrazza","Invia al gruppo",
 "Chat del gruppo","Messaggi di oggi, cifrati con il codice gruppo","Scrivi al gruppo…","Invia",
+"Comprensori","selezionato","mappa sul telefono · funziona offline","{mb} MB da scaricare","Scegli","Elimina mappa","Scarico la mappa di {name} ({mb} MB)…","Impossibile scaricare la mappa del comprensorio. Controlla la connessione.","Sei a {name}","Cambia","Mappa eliminata: {name}",null,
 ];

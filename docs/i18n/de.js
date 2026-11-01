@@ -146,4 +146,5 @@ null,null,"Verbindung","Einstellungen","SOS – Alarm für deine Gruppe","Chat",
 "Ort","z. B. Rifugio Graffer","Uhrzeit","in 15 Min.","in 30 Min.","in 1 Std.","in 1,5 Std.",
 "Notiz","(optional)","z. B. Mittagessen, wir nehmen einen Tisch auf der Terrasse","An die Gruppe senden",
 "Gruppenchat","Nachrichten von heute, verschlüsselt mit dem Gruppencode","Schreib der Gruppe…","Senden",
+"Skigebiete","ausgewählt","Karte auf dem Handy · funktioniert offline","{mb} MB zum Herunterladen","Auswählen","Karte löschen","Lade die Karte von {name} ({mb} MB)…","Karte des Skigebiets konnte nicht geladen werden. Prüfe die Verbindung.","Du bist in {name}","Wechseln","Karte gelöscht: {name}",null,
 ];

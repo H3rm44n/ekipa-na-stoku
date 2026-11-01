@@ -146,4 +146,5 @@ null,null,"Conexiune","Setări","SOS – alarmă pentru gașcă","Chat","Chatul 
 "Loc","ex. Rifugio Graffer","Ora","în 15 min","în 30 min","în 1 h","în 1,5 h",
 "Notă","(opțional)","ex. prânz, luăm o masă pe terasă","Trimite găștii",
 "Chatul găștii","Mesajele de azi, criptate cu codul de grup","Scrie găștii…","Trimite",
+"Stațiuni","selectată","hartă în telefon · merge offline","{mb} MB de descărcat","Alege","Șterge harta","Descarc harta stațiunii {name} ({mb} MB)…","Harta stațiunii nu a putut fi descărcată. Verifică conexiunea.","Ești la {name}","Schimbă","Hartă ștearsă: {name}",null,
 ];

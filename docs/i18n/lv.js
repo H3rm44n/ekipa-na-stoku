@@ -146,4 +146,5 @@ null,null,"Savienojums","Iestatījumi","SOS – trauksme komandai","Tērzēšana
 "Vieta","piem. Rifugio Graffer","Laiks","pēc 15 min","pēc 30 min","pēc 1 h","pēc 1,5 h",
 "Piezīme","(nav obligāti)","piem. pusdienas, ņemam galdiņu uz terases","Sūtīt komandai",
 "Komandas tērzēšana","Šodienas ziņas, šifrētas ar grupas kodu","Raksti komandai…","Sūtīt",
+"Kūrorti","izvēlēts","karte tālrunī · darbojas bezsaistē","{mb} MB lejupielādei","Izvēlēties","Dzēst karti","Lejupielādēju kūrorta {name} karti ({mb} MB)…","Kūrorta karti neizdevās lejupielādēt. Pārbaudi savienojumu.","Tu esi kūrortā {name}","Pārslēgt","Karte izdzēsta: {name}",null,
 ];

@@ -146,4 +146,5 @@ null,null,"Conexión","Ajustes","SOS – alarma para tu grupo","Chat","Chat del 
 "Lugar","p. ej. Rifugio Graffer","Hora","en 15 min","en 30 min","en 1 h","en 1,5 h",
 "Nota","(opcional)","p. ej. comida, cogemos mesa en la terraza","Enviar al grupo",
 "Chat del grupo","Mensajes de hoy, cifrados con el código de grupo","Escribe al grupo…","Enviar",
+"Estaciones","seleccionada","mapa en el móvil · funciona sin conexión","{mb} MB para descargar","Elegir","Borrar mapa","Descargando el mapa de {name} ({mb} MB)…","No se pudo descargar el mapa de la estación. Revisa la conexión.","Estás en {name}","Cambiar","Mapa borrado: {name}",null,
 ];

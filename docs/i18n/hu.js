@@ -146,4 +146,5 @@ null,null,"Kapcsolat","Beállítások","SOS – riasztás a csapatnak","Chat","C
 "Hely","pl. Rifugio Graffer","Időpont","15 perc múlva","30 perc múlva","1 óra múlva","1,5 óra múlva",
 "Megjegyzés","(nem kötelező)","pl. ebéd, foglalunk asztalt a teraszon","Küldés a csapatnak",
 "Csapatchat","Mai üzenetek, a csoportkóddal titkosítva","Írj a csapatnak…","Küldés",
+"Síterepek","kiválasztva","térkép a telefonon · offline is működik","{mb} MB letöltendő","Kiválasztás","Térkép törlése","{name} térképének letöltése ({mb} MB)…","A síterep térképét nem sikerült letölteni. Ellenőrizd a kapcsolatot.","Itt vagy: {name}","Váltás","Térkép törölve: {name}",null,
 ];

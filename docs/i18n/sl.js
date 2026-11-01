@@ -146,4 +146,5 @@ null,null,"Povezava","Nastavitve","SOS – alarm za ekipo","Klepet","Klepet ekip
 "Kraj","npr. Rifugio Graffer","Ura","čez 15 min","čez 30 min","čez 1 h","čez 1,5 h",
 "Opomba","(neobvezna)","npr. kosilo, vzamemo mizo na terasi","Pošlji ekipi",
 "Klepet ekipe","Današnja sporočila, šifrirana s kodo skupine","Piši ekipi…","Pošlji",
+"Smučišča","izbrano","zemljevid v telefonu · deluje brez povezave","{mb} MB za prenos","Izberi","Izbriši zemljevid","Prenašam zemljevid smučišča {name} ({mb} MB)…","Zemljevida smučišča ni bilo mogoče prenesti. Preveri povezavo.","Si na smučišču {name}","Preklopi","Zemljevid izbrisan: {name}",null,
 ];

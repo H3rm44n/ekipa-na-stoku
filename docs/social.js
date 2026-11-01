@@ -324,17 +324,10 @@ function syncPoiLayer() {
   }
 }
 map.on('zoomend', syncPoiLayer);
-let poiRetry = 0;
-async function loadPois(force) {
-  if (!S.net || !S.netMeta) return;
-  const key = 'ek.poi2:' + S.netMeta.bbox.join(',');
-  let list = !force && LS.get(key, null);
-  if (!list && !force && S.netMeta.bbox.join() === RESORT.bbox.join()) list = (await bundledResort())?.pois || null;
-  if (!list) {
-    try { list = await fetchPois(S.netMeta.bbox); LS.set(key, list); poiRetry = 0; }
-    catch { if (poiRetry < 6) setTimeout(() => loadPois(force), 30e3 * 2 ** poiRetry++); return; }   // Overpass busy: try again later
-  }
-  S.net.setPois(list); drawPois(); syncPoiLayer(); tick(true);
+// Huts and bars come with the resort pack.
+function loadPois() {
+  if (!S.net || !S.packData) return;
+  S.net.setPois(S.packData.pois || []); drawPois(); syncPoiLayer(); tick(true);
 }
 HOOK.netReady.push(() => setTimeout(() => loadPois(), 0));
 

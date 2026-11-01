@@ -64,20 +64,20 @@ async function pubTopic(kind, id, obj, retain = true) {
 }
 
 /* ---------- map ---------- */
-const map = L.map('map', { zoomControl: false, preferCanvas: true, tap: true }).setView(RESORT.center, 13);
-// Base maps. With a MapTiler key (App Store build) both maps come from MapTiler under its terms;
-// without one: OpenTopoMap (CC-BY-SA, light use) and Esri imagery.
-const MAPTILER_KEY = '';
-const OSM_ATTR = `<a href="https://www.openstreetmap.org/copyright">${t('map.osm')}</a>`;
-const baseLayers = MAPTILER_KEY ? [
-  [t('map.topo'), L.tileLayer(`https://api.maptiler.com/maps/winter-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, { maxZoom: 18, attribution: `© MapTiler ${OSM_ATTR}` })],
-  [t('map.sat'), L.tileLayer(`https://api.maptiler.com/maps/satellite/256/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`, { maxZoom: 19, attribution: `© MapTiler ${OSM_ATTR}` })],
-] : [
-  [t('map.topo'), L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 17, maxNativeZoom: 17, attribution: `${OSM_ATTR}, SRTM · © OpenTopoMap (CC-BY-SA)` })],
-  [t('map.sat'), L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri, Maxar, Earthstar Geographics' })],
-];
-let baseIdx = LS.get('ek.base', 0) % baseLayers.length;
-baseLayers[baseIdx][1].addTo(map);
+const map = L.map('map', { zoomControl: false, preferCanvas: true, tap: true, maxZoom: 18 }).setView(RESORT.center, 13);
+// Base map: the resort pack (OpenStreetMap vector map + Copernicus terrain, see packs.js) drawn by MapLibre
+// underneath Leaflet's layers, so it works offline and needs no paid map service.
+const glLayer = L.maplibreGL({ style: EMPTY_STYLE, interactive: false }).addTo(map);
+// Required credits (OpenStreetMap ODbL, Copernicus DEM) stay visible on the map itself.
+map.attributionControl.setPrefix(false);
+map.attributionControl.addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Protomaps · Copernicus DEM');
+const glMap = () => glLayer.getMaplibreMap();
+// Swap the whole style (no diff) once the start-up style has loaded, or it can be dropped.
+function setBaseStyle(style) {
+  const g = glMap();
+  if (!g) return;
+  if (g.isStyleLoaded()) g.setStyle(style, { diff: false }); else g.once('load', () => g.setStyle(style, { diff: false }));
+}
 const renderer = L.canvas({ padding: 0.3, tolerance: 8 });
 const netLayer = L.layerGroup().addTo(map);
 const arrowLayer = L.layerGroup().addTo(map);
@@ -94,12 +94,6 @@ map.on('contextmenu', e => {
   else if (S.me?.demo) { setMyPos([e.latlng.lat, e.latlng.lng, null, 5, 0, null], true); toast(t('t.demoPos')); }
 });
 
-$('#btnLayers').onclick = () => {
-  map.removeLayer(baseLayers[baseIdx][1]);
-  baseIdx = (baseIdx + 1) % baseLayers.length;
-  baseLayers[baseIdx][1].addTo(map); baseLayers[baseIdx][1].bringToBack();
-  LS.set('ek.base', baseIdx); toast(t('t.map', { name: baseLayers[baseIdx][0] }));
-};
 $('#btnMe').onclick = () => {
   if (S.myPos) { S.follow = true; map.setView([S.myPos[0], S.myPos[1]], Math.max(map.getZoom(), 15)); }
   else toast(S.gpsError || t('t.waitGps'));
@@ -108,7 +102,7 @@ $('#btnFit').onclick = fitAll;
 function fitAll() {
   const pts = [...visibleFriends()].map(f => [f.pos[0], f.pos[1]]);
   if (S.myPos) pts.push([S.myPos[0], S.myPos[1]]);
-  if (!pts.length) { map.setView(RESORT.center, 13); return; }
+  if (!pts.length) { map.setView((S.resort || RESORT).center, 13); return; }
   S.follow = false;
   if (pts.length === 1) map.setView(pts[0], 15);
   else map.fitBounds(pts, { padding: [60, 60], maxZoom: 16 });
@@ -213,33 +207,55 @@ function drawLabels() {
 }
 map.on('zoomend moveend', () => { if (!document.hidden) { drawArrows(); drawLabels(); } });
 
-let bundled = null;
-function bundledResort() { return bundled || (bundled = fetch('data/skirama.json').then(r => (r.ok ? r.json() : null)).catch(() => null)); }
-async function loadNet(bbox, center, label, force) {
-  const key = 'ek.net2:' + bbox.join(',');
-  try { for (const k of Object.keys(localStorage)) if (k.startsWith('ek.net:')) LS.del(k); } catch {}   // old format without lift details
-  let data = !force && LS.get(key, null);
-  // The home resort ships with the app (works offline, no wait for OpenStreetMap); "reload" fetches fresh data.
-  if (!data && !force && bbox.join() === RESORT.bbox.join()) data = (await bundledResort())?.net || null;
-  if (!data) {
-    showBanner(t('b.loadNet'));
-    try { data = await fetchSkiData(bbox); }
-    catch (err) {
-      showBanner(t('b.netFail'), t('b.retry'), () => loadNet(bbox, center, label, true));
-      return;
-    }
-    if (!LS.set(key, data)) { for (const k of Object.keys(localStorage)) if (k.startsWith('ek.net2:') && k !== key) LS.del(k); LS.set(key, data); }
-  }
-  S.net = new SkiNet(data, center);
-  for (const h of HOOK.netReady) try { h(); } catch (err) { console.error(err); }
-  S.netMeta = { bbox, center, label }; LS.set('ek.netmeta', S.netMeta);
+// Opens a resort: downloads its pack once (then offline), shows its map and builds the piste network.
+async function loadResort(r, opts = {}) {
+  if (!r) return;
+  try { for (const k of Object.keys(localStorage)) if (/^ek\.(net2?|poi2?):/.test(k)) LS.del(k); } catch {}   // caches from before resort packs
+  S.resort = r; LS.set('ek.resort', r.id);
+  if (!(await isDownloaded(r))) showBanner(t('rs.loading', { name: r.name, mb: fmt1(r.size / 1e6) }));
+  let data;
+  try { data = await openPack(r); }
+  catch (err) { showBanner(t('rs.fail'), t('b.retry'), () => loadResort(r, opts)); return; }
+  if (S.resort !== r) return;   // another resort was picked meanwhile
   hideBanner();
+  setBaseStyle(skiStyle(r));
+  S.packData = data;
+  S.net = new SkiNet(data.net, r.center);
+  S.netMeta = { id: r.id, bbox: r.bbox, center: r.center, label: r.name }; LS.set('ek.netmeta', S.netMeta);
+  for (const h of HOOK.netReady) try { h(); } catch (err) { console.error(err); }
   drawNet(); drawArrows(); drawLabels();
   const lifts = S.net.ways.filter(w => w.kind === 'lift').length, pistes = S.net.ways.filter(w => w.kind === 'piste').length;
-  $('#stNet').textContent = t('st.net', { label, p: pistes, l: lifts });
+  $('#stNet').textContent = t('st.net', { label: r.name, p: pistes, l: lifts });
+  if (opts.fly || !S.myPos) {   // show where the pistes are, not the whole pack area
+    const lifts = S.net.ways.filter(w => w.kind === 'lift'), pts = (lifts.length ? lifts : S.net.ways).flatMap(w => [w.pts[0], w.pts[w.pts.length - 1]]).map(n => [n.lat, n.lon]);
+    S.follow = false; map.fitBounds(pts, { paddingTopLeft: [10, 60], paddingBottomRight: [10, sheetH() + 10] });
+  }
   if (S.me?.demo) startDemo();
+  renderResorts();
   tick(true);
 }
+// Suggest switching when GPS shows you in another resort from the catalog.
+const resortAsked = new Set();
+HOOK.pos.push(p => {
+  const r = resortAt(p[0], p[1]);
+  if (!r || r === S.resort || resortAsked.has(r.id)) return;
+  resortAsked.add(r.id);
+  showBanner(t('rs.switch', { name: r.name }), t('rs.switchBtn'), () => { hideBanner(); loadResort(r, { fly: true }); });
+});
+async function renderResorts() {
+  const box = $('#stResorts'); if (!box || !CATALOG) return;
+  const rows = await Promise.all(CATALOG.map(async r => {
+    const on = r === S.resort, have = await isDownloaded(r);
+    return `<div class="resort${on ? ' on' : ''}"><div class="pn"><b>${esc(r.name)}</b><span>${on ? t('rs.active') + ' · ' : ''}${have ? t('rs.ready') : t('rs.size', { mb: fmt1(r.size / 1e6) })}</span></div>
+      <div class="acts">${on ? '' : `<button class="btn sm" data-resort="${esc(r.id)}">${t('rs.use')}</button>`}${have && !on ? `<button class="btn sm danger" data-resortdel="${esc(r.id)}">${t('rs.delete')}</button>` : ''}</div></div>`;
+  }));
+  box.innerHTML = rows.join('');
+}
+document.addEventListener('click', async e => {
+  const u = e.target.closest('[data-resort]'), d = e.target.closest('[data-resortdel]');
+  if (u) { $('#settings').hidden = true; loadResort(resortById(u.dataset.resort), { fly: true }); }
+  if (d) { const r = resortById(d.dataset.resortdel); await deletePack(r); toast(t('rs.deleted', { name: r.name })); renderResorts(); }
+});
 
 /* ---------- crypto + MQTT ---------- */
 const te = new TextEncoder(), td = new TextDecoder();
@@ -481,7 +497,8 @@ const BOT_NAMES = [['Ania', '#d6249f'], ['Marek', '#16a34a'], ['Zosia', '#7c3aed
 function startDemo() {
   stopDemo();
   if (!S.net) return;
-  if (!S.myPos) setMyPos([46.2298, 10.8268, 1520, 8, 0, null], true);
+  const R = S.resort;
+  if (!S.myPos || (R && resortAt(S.myPos[0], S.myPos[1], 0) !== R)) setMyPos([R ? R.center[0] : 46.2298, R ? R.center[1] : 10.8268, null, 8, 0, null], true);
   const liftsNear = ([lat, lon]) => {
     const [cx, cy] = S.net.P(lat, lon);
     return S.net.ways.filter(w => w.kind === 'lift' && w.len > 300).sort((a, b) => Math.hypot(a.pts[0].x - cx, a.pts[0].y - cy) - Math.hypot(b.pts[0].x - cx, b.pts[0].y - cy)).slice(0, 8);
@@ -489,7 +506,7 @@ function startDemo() {
   const lifts = liftsNear(S.myPos);
   if (!lifts.length) return;
   const bots = BOT_NAMES.map(([name, color, anchor], i) => {
-    const near = anchor ? liftsNear(anchor) : lifts;
+    const near = anchor && resortAt(anchor[0], anchor[1], 0) === S.resort ? liftsNear(anchor) : lifts;
     const w = near[i % Math.min(near.length, 3)] || lifts[i % lifts.length];
     return { id: 'demo-' + i, name, color, w, along: (i * 0.23 % 0.8) * w.len, wait: 0, track: [], home: near.length ? near : lifts };
   });
@@ -803,7 +820,7 @@ function openSettings() {
   let color = S.me.color;
   $('#stNick').value = S.me.nick || ''; $('#stFirst').value = S.me.first || ''; $('#stLast').value = S.me.last || '';
   $('#stEco').checked = !!S.me.eco;
-  renderBattery(); sampleBattery(true).then(renderBattery);
+  renderBattery(); sampleBattery(true).then(renderBattery); renderResorts();
   colorPicker($('#stColors'), color, c => { color = c; });
   $('#stGroup').textContent = S.me.group;
   $('#stWake').checked = !!S.me.wake; $('#stShare').checked = S.me.share !== false; $('#stDemo').checked = !!S.me.demo;
@@ -840,13 +857,7 @@ $('#btnLeave').onclick = () => {
   if (!b.dataset.confirm) { b.dataset.confirm = '1'; b.textContent = t('leave.confirm'); setTimeout(() => { delete b.dataset.confirm; b.textContent = t('leave'); }, 4000); return; }
   clearMine(); for (const h of HOOK.leave) try { h(); } catch {} setTimeout(() => { disconnect(); stopGps(); stopDemo(); LS.del('ek.me'); location.hash = ''; location.reload(); }, 600);
 };
-$('#btnNetResort').onclick = () => { $('#settings').hidden = true; loadNet(RESORT.bbox, RESORT.center, 'Madonna di Campiglio', true); };
-$('#btnNetHere').onclick = () => {
-  $('#settings').hidden = true;
-  const c = map.getCenter(), dLat = 0.09, dLon = 0.12;
-  const bbox = [c.lat - dLat, c.lng - dLon, c.lat + dLat, c.lng + dLon].map(v => +v.toFixed(3));
-  loadNet(bbox, [c.lat, c.lng], t('net.view'), true);
-};
+
 
 function applyMode() {
   if (S.me.demo) { stopGps(); hideBannerIf('GPS'); startDemo(); }
@@ -859,11 +870,10 @@ async function start() {
   G = await deriveGroup(S.me.group);
   connect();
   applyWake();
-  let meta = S.netMeta || { bbox: RESORT.bbox, center: RESORT.center, label: 'Madonna di Campiglio' };
-  if (meta.label === 'Madonna di Campiglio' && meta.bbox.join() !== RESORT.bbox.join()) meta = { ...meta, bbox: RESORT.bbox };   // area grew to Pinzolo + Folgarida
   if (!S.me.demo) startGps();
   tick(true);
-  loadNet(meta.bbox, meta.center, meta.label);
+  await loadCatalog();
+  loadResort(resortById(LS.get('ek.resort', null) || S.netMeta?.id) || CATALOG[0]);
 }
 
 // In the iPhone app the help/privacy pages open in Safari instead of replacing the app screen.

@@ -146,4 +146,5 @@ null,null,"Pripojenie","Nastavenia","SOS – poplach pre partiu","Chat","Chat pa
 "Miesto","napr. Rifugio Graffer","Čas","o 15 min","o 30 min","o 1 h","o 1,5 h",
 "Poznámka","(nepovinná)","napr. obed, berieme stôl na terase","Poslať partii",
 "Chat partie","Dnešné správy, šifrované kódom skupiny","Napíš partii…","Odoslať",
+"Strediská","vybrané","mapa v telefóne · funguje offline","{mb} MB na stiahnutie","Vybrať","Vymazať mapu","Sťahujem mapu strediska {name} ({mb} MB)…","Mapu strediska sa nepodarilo stiahnuť. Skontroluj pripojenie.","Si v stredisku {name}","Prepnúť","Mapa vymazaná: {name}",null,
 ];

@@ -146,4 +146,5 @@ null,null,"Ceangal","Socruithe","SOS – rabhadh do do chriú","Comhrá","Comhr�
 "Áit","m.sh. Rifugio Graffer","Am","i gceann 15 nóim","i gceann 30 nóim","i gceann 1 u","i gceann 1.5 u",
 "Nóta","(roghnach)","m.sh. lón, tógfaimid bord ar an ardán","Seol chuig an gcriú",
 "Comhrá an chriú","Teachtaireachtaí an lae, criptithe le cód an ghrúpa","Scríobh chuig an gcriú…","Seol",
+"Ionaid sciála","roghnaithe","léarscáil ar do ghuthán · oibríonn as líne","{mb} MB le híoslódáil","Roghnaigh","Scrios an léarscáil","Ag íoslódáil léarscáil {name} ({mb} MB)…","Níorbh fhéidir an léarscáil a íoslódáil. Seiceáil do cheangal.","Tá tú ag {name}","Athraigh","Léarscáil scriosta: {name}",null,
 ];

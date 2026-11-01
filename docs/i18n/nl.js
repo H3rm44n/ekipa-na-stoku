@@ -146,4 +146,5 @@ null,null,"Verbinding","Instellingen","SOS – alarm voor je groep","Chat","Groe
 "Plek","bijv. Rifugio Graffer","Tijd","over 15 min","over 30 min","over 1 u","over 1,5 u",
 "Notitie","(optioneel)","bijv. lunch, we nemen een tafel op het terras","Naar de groep sturen",
 "Groepschat","Berichten van vandaag, versleuteld met de groepscode","Stuur de groep een bericht…","Versturen",
+"Skigebieden","gekozen","kaart op je telefoon · werkt offline","{mb} MB te downloaden","Kiezen","Kaart verwijderen","Kaart van {name} downloaden ({mb} MB)…","Kaart van het skigebied kon niet worden gedownload. Controleer je verbinding.","Je bent in {name}","Wisselen","Kaart verwijderd: {name}",null,
 ];

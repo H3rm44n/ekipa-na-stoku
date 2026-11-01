@@ -1,7 +1,8 @@
 // Offline shell + map tiles you have already seen (useful where the slope has weak signal).
-const SHELL = 'ekipa-shell-v11', TILES = 'ekipa-tiles-v1', MAX_TILES = 2500;
-const ASSETS = ['./', 'index.html', 'app.js', 'net.js', 'stats.js', 'social.js', 'crew.js', 'history.js', 'i18n.js', 'i18n/en.js', 'fonts/fonts.css', 'data/skirama.json', 'manifest.webmanifest', 'icon.svg',
-  'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/mqtt.min.js', 'vendor/capacitor.js'];
+const SHELL = 'ekipa-shell-v12', TILES = 'ekipa-tiles-v1', MAX_TILES = 2500;
+const ASSETS = ['./', 'index.html', 'app.js', 'net.js', 'stats.js', 'social.js', 'crew.js', 'history.js', 'i18n.js', 'i18n/en.js', 'fonts/fonts.css', 'packs.js', 'packs/catalog.json', 'manifest.webmanifest', 'icon.svg',
+  'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/mqtt.min.js', 'vendor/capacitor.js',
+  'vendor/maplibre-gl.js', 'vendor/maplibre-gl.css', 'vendor/leaflet-maplibre-gl.js', 'vendor/pmtiles.js', 'vendor/basemaps.js'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(ASSETS)).catch(() => {})); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -29,6 +30,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   if (url.includes('/api/interpreter') || url.startsWith('wss:')) return;
+  if (/\/packs\/[^/]+\.(pmtiles|json)$/.test(url) && !url.endsWith('catalog.json')) return;   // resort packs are stored by packs.js
   // App files: network first (fresh updates), cache as fallback for no signal.
   e.respondWith(fetch(req).then(r => { if (r.ok) caches.open(SHELL).then(c => c.put(req, r.clone())); return r; })
     .catch(() => caches.match(req, { ignoreSearch: true }).then(h => h || caches.match('index.html'))));

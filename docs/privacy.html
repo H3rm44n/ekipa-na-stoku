@@ -13,7 +13,7 @@
 
 <article id="en">
 <h1>Privacy policy</h1>
-<p class="meta">Ekipa (ski crew app) · last updated 1 November 2026</p>
+<p class="meta">Ekipa (ski crew app) · last updated 1 November 2026 (maps v2)</p>
 
 <h2>Who is responsible</h2>
 <p>Ekipa is developed by Jakub Hermanski (“we”). Questions about privacy: open an issue at <a href="https://github.com/H3rm44n/ekipa-na-stoku/issues">github.com/H3rm44n/ekipa-na-stoku/issues</a> (see <a href="support.html">Help and contact</a>).</p>
@@ -40,7 +40,7 @@
 <h2>Where data goes</h2>
 <ul>
 <li><b>Message servers (MQTT):</b> encrypted messages pass through and are kept as “retained” messages on HiveMQ (broker.hivemq.com) and EMQX (broker.emqx.io), so a newly opened app sees the latest state. These operators can see technical data (IP address, timing, message size) but not the content.</li>
-<li><b>Map data:</b> map tiles are loaded from OpenTopoMap and Esri; piste data from OpenStreetMap (Overpass API). These services see your IP address and the map area you view.</li>
+<li><b>Maps:</b> resort map packs (built from OpenStreetMap and Copernicus DEM data) are downloaded once from our own hosting and then used offline on your phone. No third-party map service sees where you look on the map.</li>
 <li><b>Hosting:</b> the web version is served by GitHub Pages; the iPhone app is distributed by Apple.</li>
 </ul>
 <p>We do not sell or share data with anyone else.</p>
@@ -68,7 +68,7 @@
 
 <article id="pl" lang="pl">
 <h1>Polityka prywatności</h1>
-<p class="meta">Ekipa (aplikacja dla ekipy na nartach) · aktualizacja 1 listopada 2026</p>
+<p class="meta">Ekipa (aplikacja dla ekipy na nartach) · aktualizacja 1 listopada 2026 (mapy v2)</p>
 
 <h2>Kto odpowiada</h2>
 <p>Aplikację Ekipa tworzy Jakub Hermanski („my”). Pytania o prywatność: zgłoszenie na <a href="https://github.com/H3rm44n/ekipa-na-stoku/issues">github.com/H3rm44n/ekipa-na-stoku/issues</a> (zob. <a href="support.html">Pomoc i kontakt</a>).</p>
@@ -95,7 +95,7 @@
 <h2>Dokąd trafiają dane</h2>
 <ul>
 <li><b>Serwery wiadomości (MQTT):</b> zaszyfrowane wiadomości przechodzą przez HiveMQ (broker.hivemq.com) i EMQX (broker.emqx.io) i są tam przechowywane jako „retained”, żeby nowo otwarta aplikacja widziała aktualny stan. Operatorzy widzą dane techniczne (adres IP, czas, rozmiar), ale nie treść.</li>
-<li><b>Mapy:</b> podkłady z OpenTopoMap i Esri, dane tras z OpenStreetMap (Overpass API). Te usługi widzą Twój adres IP i oglądany fragment mapy.</li>
+<li><b>Mapy:</b> paczki map ośrodków (zbudowane z danych OpenStreetMap i Copernicus DEM) pobierane są raz z naszego serwera, a potem działają w telefonie offline. Żadna zewnętrzna usługa map nie widzi, który fragment mapy oglądasz.</li>
 <li><b>Hosting:</b> wersję webową udostępnia GitHub Pages, aplikację na iPhone dystrybuuje Apple.</li>
 </ul>
 <p>Nie sprzedajemy ani nie przekazujemy danych nikomu innemu.</p>

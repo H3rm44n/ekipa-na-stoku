@@ -14,6 +14,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
 <style>
 /* Layout: full-bleed map, signage-style top bar, bottom sheet with the crew list */
 :root{
@@ -33,7 +34,7 @@ html,body{height:100%;margin:0}
 body{font:15px/1.4 var(--body);color:var(--ink);background:var(--snow);overflow:hidden;-webkit-tap-highlight-color:transparent}
 button{font:inherit;color:inherit;cursor:pointer}
 #map{position:fixed;inset:0;background:#dfe8ee}
-.leaflet-control-attribution{font-size:9px;opacity:.75;margin-bottom:calc(var(--sheet-h,140px) + var(--sab)) !important}
+.leaflet-control-attribution{font-size:9px;opacity:.85;max-width:calc(100vw - 70px);white-space:normal;text-align:right;margin-bottom:calc(var(--sheet-h,140px) + var(--sab)) !important}
 
 .topbar{position:fixed;left:0;right:0;top:0;z-index:1000;display:flex;align-items:center;gap:8px;
   padding:calc(var(--sat) + 8px) max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));
@@ -310,6 +311,10 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 .msgmore{position:absolute;top:2px;right:4px;border:0;background:none;color:inherit;opacity:.55;font-size:16px;line-height:1;padding:2px 4px}
 .msg:not(.mine){padding-right:26px}
 .msgacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+/* resorts */
+.resort{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.resort.on b{color:var(--accent)}
+.resort .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 @media (prefers-reduced-motion:reduce){.fm .pulse{animation:none;display:none}}
 </style>
 </head>
@@ -334,7 +339,6 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 <div class="banner" id="banner" hidden></div>
 
 <div class="fabs">
-  <button class="iconbtn" id="btnLayers" data-i-aria="h.layers"><svg viewBox="0 0 24 24"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 16 10 6 10-6"/></svg></button>
   <button class="iconbtn" id="btnFit" data-i-aria="h.fit"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
   <button class="iconbtn" id="btnMe" data-i-aria="h.me"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
 </div>
@@ -386,10 +390,9 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
     <label class="toggle" for="stShare"><span data-i="se.share"></span><input type="checkbox" id="stShare"></label>
     <label class="toggle" for="stDemo"><span data-i="se.demo"></span><input type="checkbox" id="stDemo"></label>
     <div class="hr"></div>
-    <div class="box"><h3 data-i="se.net"></h3><p class="small" id="stNet">–</p>
-      <div class="actions" style="margin-top:8px"><button class="btn" id="btnNetResort">Madonna di Campiglio</button><button class="btn" id="btnNetHere" data-i="se.netHere"></button></div></div>
+    <div class="box"><h3 data-i="rs.title"></h3><div id="stResorts"></div><p class="small" id="stNet" style="margin-top:6px">–</p></div>
     <div class="actions"><button class="btn primary" id="btnSave" data-i="se.save"></button><button class="btn" id="btnLeave" style="color:var(--bad)" data-i="leave"></button></div>
-    <details class="box"><summary style="font-weight:600;cursor:pointer" data-i="se.lic"></summary><p class="note" style="margin-top:6px" data-i-html="se.licText"></p></details>
+    <details class="box"><summary style="font-weight:600;cursor:pointer" data-i="se.lic"></summary><p class="note" style="margin-top:6px" data-i-html="se.licData"></p></details>
     <p class="note" data-i-html="se.links"></p>
     <p class="note" data-i="se.note"></p>
   </div>
@@ -426,9 +429,14 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 
 <script src="i18n.js"></script>
 <script src="vendor/leaflet.js"></script>
+<script src="vendor/maplibre-gl.js"></script>
+<script src="vendor/leaflet-maplibre-gl.js"></script>
+<script src="vendor/pmtiles.js"></script>
+<script src="vendor/basemaps.js"></script>
 <script src="vendor/mqtt.min.js"></script>
 <script src="vendor/capacitor.js"></script>
 <script src="net.js"></script>
+<script src="packs.js"></script>
 <script src="app.js"></script>
 <script src="stats.js"></script>
 <script src="social.js"></script>

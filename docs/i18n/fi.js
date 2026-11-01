@@ -146,4 +146,5 @@ null,null,"Yhteys","Asetukset","SOS – hälytys porukalle","Chat","Porukan chat
 "Paikka","esim. Rifugio Graffer","Aika","15 min päästä","30 min päästä","1 h päästä","1,5 h päästä",
 "Huomio","(valinnainen)","esim. lounas, otamme pöydän terassilta","Lähetä porukalle",
 "Porukan chat","Päivän viestit, salattu ryhmäkoodilla","Kirjoita porukalle…","Lähetä",
+"Hiihtokeskukset","valittu","kartta puhelimessa · toimii ilman verkkoa","{mb} Mt ladattavaa","Valitse","Poista kartta","Ladataan keskuksen {name} karttaa ({mb} Mt)…","Kartan lataus epäonnistui. Tarkista yhteys.","Olet keskuksessa {name}","Vaihda","Kartta poistettu: {name}",null,
 ];
