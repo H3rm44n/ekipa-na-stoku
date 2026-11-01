@@ -102,7 +102,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .steps .meta{font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .pb{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:22px;padding:0 6px;border-radius:6px;color:#fff;font:700 12px/1 var(--display);letter-spacing:.04em}
 .pb.easy{background:var(--easy)} .pb.inter{background:var(--inter)} .pb.adv{background:#111;color:#fff} .pb.free{background:var(--free)}
-.pb.lift{background:#4a5a6a} .pb.walk{background:transparent;color:var(--ink-2);border:1px dashed var(--muted)} .pb.conn{background:#7b8fa3}
+.pb.lift{background:#7b2fbe} .pb.walk{background:transparent;color:var(--ink-2);border:1px dashed var(--muted)} .pb.conn{background:#7b8fa3}
 .actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn{height:42px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:600}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -204,7 +204,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 .lbl.pref{min-width:20px;height:20px;padding:0 4px;border-radius:10px;display:grid;place-items:center;color:#fff;border:2px solid #fff;font-size:12.5px}
 .lbl.pref.nov{background:#16a34a}.lbl.pref.easy{background:#1d6fe0}.lbl.pref.inter{background:#d42a2a}.lbl.pref.adv{background:#111}.lbl.pref.free{background:#e08a00}
 .lbl.pref.nm{border-radius:6px;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis}
-.lbl.lift{background:#22313f;color:#fff;border-radius:5px;padding:3px 5px;font-size:10.5px;letter-spacing:.04em;border:1px solid #fff}
+.lbl.lift{background:#7b2fbe;color:#fff;border-radius:5px;padding:3px 5px;font-size:10.5px;letter-spacing:.04em;border:1px solid #fff}
 .lbl.lift b{font-weight:700}
 .poi.bar{background:#b4236b}.poi.cafe{background:#6b4f3a}.poi.food{background:#c2410c}
 .flag{position:relative;width:12px;height:40px}
@@ -219,6 +219,60 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 .pn{min-width:0;display:flex;flex-direction:column}
 .pn span{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pd{font:700 16px/1 var(--display);font-variant-numeric:tabular-nums}
+/* SOS under the settings button */
+.sosfab{position:fixed;top:calc(var(--sat) + 58px);right:max(12px,env(safe-area-inset-right));z-index:1000;width:40px;height:40px;border-radius:12px;border:2px solid #fff;background:var(--bad);color:#fff;font:700 14px/1 var(--display);letter-spacing:.04em;box-shadow:var(--shadow)}
+.sosfab.on{animation:sosb 1s infinite}
+@keyframes sosb{50%{background:#7f1d1d}}
+/* my status pill */
+.sheet h2.me-line{display:flex;align-items:center;gap:8px}
+.sheet h2.me-line>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stpill{flex:none;height:28px;padding:0 10px;border-radius:14px;border:1px solid var(--line);background:var(--card);font:600 13px/1 var(--body);color:var(--ink);display:inline-flex;align-items:center;gap:4px}
+.stpill.wait{background:#fff3e0;border-color:#ffcc80;color:#9a4b00}
+.stpill.hut{background:#f3e8d8;border-color:#d8b98f;color:#6b4423}
+.stpill.done{background:var(--snow);color:var(--ink-2)}
+.stpill span{font-size:10px;opacity:.7}
+/* action bar: chat left, guide right */
+.actbar{flex-wrap:nowrap}
+.actbar .grow{flex:1}
+.btn .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-weight:700}
+.list>*{flex-shrink:0}
+.chatlast{cursor:pointer;font-size:13px;color:var(--ink-2);margin:-2px 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* chat */
+.chatpanel{display:flex;flex-direction:column;height:min(640px,calc(100dvh - var(--sat) - 40px));max-height:none}
+.chatlist{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:4px 2px}
+.msg{max-width:80%;align-self:flex-start;background:var(--snow);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:6px 10px}
+.msg.mine{align-self:flex-end;background:var(--accent);color:#fff;border-color:var(--accent);border-radius:14px 14px 4px 14px}
+.msg .who{border:0;padding:0;background:none;font-size:12px;font-weight:700;color:var(--c)}
+.msg .tm{font-size:10px;opacity:.6;margin-left:6px}
+.msg p{margin:0;font-size:15px;white-space:pre-wrap;overflow-wrap:anywhere}
+.chatday{align-self:center;font-size:11px;color:var(--muted)}
+.chatform{display:flex;gap:8px;margin-top:6px}
+.chatform input{flex:1;min-width:0}
+.quick{margin:4px 0 0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.quick .btn{flex:none}
+/* group */
+.mrow{display:grid;grid-template-columns:32px 1fr auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.mrow .role{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+.mrow .acts{display:flex;gap:4px}
+/* my day */
+.daynav{display:flex;align-items:center;gap:8px}
+.daynav .t{flex:1;min-width:0}
+.prof{width:100%;height:84px;display:block}
+.tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.tl li{display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;padding:7px 4px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:8px}
+.tl li.on{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.tl .tm{font:700 14px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.tl .nm b{display:block;font-size:14px}
+.tl .nm span{font-size:12px;color:var(--ink-2)}
+.tl .mx{font:700 15px/1 var(--display);text-align:right;font-variant-numeric:tabular-nums}
+.tl li.lift .nm b{color:#7b2fbe}
+.tl li.rest{cursor:default;opacity:.75}
+.runno{width:22px;height:22px;border-radius:50%;background:var(--c,#ff6b00);color:#fff;font:700 12px/22px var(--display);text-align:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.daylist{display:flex;flex-direction:column;gap:6px}
+.dayrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;text-align:left;width:100%;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px 12px}
+.dayrow b{font:700 17px/1.1 var(--display)}
+.dayrow span{font-size:12px;color:var(--ink-2)}
+.dayrow .mx{font:700 16px/1 var(--display);text-align:right}
 @media (prefers-reduced-motion:reduce){.fm .pulse{animation:none;display:none}}
 </style>
 </head>
@@ -231,6 +285,8 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
   <button class="chip" id="connChip" title="Połączenie"><span class="dot" id="connDot"></span><span id="connTxt">…</span></button>
   <button class="iconbtn" id="btnSettings" aria-label="Ustawienia"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 </header>
+
+<button class="sosfab" id="btnSos" aria-label="SOS – alarm dla ekipy">SOS</button>
 
 <div class="banner" id="banner" hidden></div>
 
@@ -275,7 +331,8 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
     </div>
     <div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Kolor</div><div class="colors" id="stColors"></div></div>
     <div class="box"><h3>Kod grupy</h3><div class="rowflex" style="align-items:center"><code id="stGroup" style="flex:1;font-size:16px;font-weight:600;user-select:all;word-break:break-all"></code><button class="btn" id="btnCopy">Kopiuj</button></div>
-      <p class="note" style="margin-top:6px">Znajomi wpisują ten sam kod po otwarciu aplikacji.</p></div>
+      <p class="note" style="margin-top:6px">„Zaproś” otwiera systemowe Udostępnij: AirDrop, WhatsApp, Messenger, SMS.</p>
+      <div class="actions" style="margin-top:8px"><button class="btn" id="btnGroup">Członkowie i admini</button></div></div>
     <div class="hr"></div>
     <div class="box"><h3>Bateria i GPS</h3><p class="small" id="stBatt">–</p></div>
     <label class="toggle" for="stEco">Tryb oszczędny (rzadszy GPS przy zjazdach)<input type="checkbox" id="stEco"></label>
@@ -302,6 +359,22 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
   </form>
 </div>
 
+<div class="modal" id="chat" hidden>
+  <div class="panel chatpanel">
+    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase">Czat ekipy</b><span id="chatSub">Wiadomości z dzisiaj, szyfrowane kodem grupy</span></div><button class="close" data-close aria-label="Zamknij">×</button></div>
+    <div class="chatlist" id="chatList"></div>
+    <div class="opts quick" id="chatQuick"></div>
+    <form class="chatform" id="chatForm"><input type="text" id="chatText" maxlength="300" placeholder="Napisz do ekipy…" autocomplete="off" enterkeyhint="send"><button class="btn primary" type="submit">Wyślij</button></form>
+  </div>
+</div>
+
+<div class="modal" id="group" hidden>
+  <div class="panel">
+    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase" id="grpTitle">Grupa</b><span id="grpSub"></span></div><button class="close" data-close aria-label="Zamknij">×</button></div>
+    <div id="grpBody"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast" hidden></div>
 
 <script src="vendor/leaflet.js"></script>
@@ -311,5 +384,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 <script src="app.js"></script>
 <script src="stats.js"></script>
 <script src="social.js"></script>
+<script src="crew.js"></script>
+<script src="history.js"></script>
 </body>
 </html>

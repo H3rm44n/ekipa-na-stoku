@@ -11,7 +11,10 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 const RESORT = { name: 'Madonna di Campiglio · Pinzolo · Folgarida-Marilleva', center: [46.2297, 10.8263], bbox: [46.13, 10.68, 46.36, 10.97] };
 const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
-const COLORS = ['#ff6b00', '#d6249f', '#16a34a', '#7c3aed', '#eab308', '#0891b2', '#a16207', '#e11d48'];
+const COLORS = ['#ff6b00', '#d6249f', '#16a34a', '#0f766e', '#eab308', '#0891b2', '#a16207', '#e11d48'];
+const OLD_COLORS = ['#7c3aed'];   // still accepted from friends on older versions
+// Lifts get their own colour so they never look like a black piste.
+const LIFT_COLOR = '#7b2fbe';
 const STATUSES = [['ride', 'Jeżdżę'], ['wait', 'Czekam na was'], ['hut', 'W schronisku'], ['done', 'Kończę']];
 const MAX_AGE_SHOW = 8 * 3600e3;
 // How often a position goes out per GPS mode. Fewer sends = radio sleeps more = less battery.
@@ -49,6 +52,9 @@ const HOOK = {
   netReady: [],   // () after the piste network loads
   longpress: null,// (latlng) long-press on the map
   rank: null,     // () => HTML for the ranking tab
+  view: null,     // () => HTML for a full-sheet view (S.view set), e.g. my day
+  meClick: null,  // () tap on my own marker
+  leave: [],      // () before leaving the group
 };
 async function pubTopic(kind, id, obj, retain = true) {
   if (!G) return;
@@ -110,12 +116,16 @@ function drawNet() {
     const ll = w.pts.map(p => [p.lat, p.lon]);
     let layer;
     if (w.kind === 'area') layer = L.polygon(ll, { renderer, stroke: false, fillColor: DIFF_COLOR[w.diff] || '#888', fillOpacity: 0.12, interactive: false });
-    else if (w.kind === 'lift') layer = L.polyline(ll, { renderer, color: '#22313f', weight: 2.5, opacity: 0.9, dashArray: w.sub.includes('bar') || w.sub.includes('drag') || w.sub === 'platter' ? '2 5' : null });
+    else if (w.kind === 'lift') {
+      const drag = w.sub.includes('bar') || w.sub.includes('drag') || w.sub === 'platter' || w.sub === 'rope_tow';
+      netLayer.addLayer(L.polyline(ll, { renderer, color: '#fff', weight: 6, opacity: 0.85, interactive: false }));
+      layer = L.polyline(ll, { renderer, color: LIFT_COLOR, weight: 3, opacity: 1, dashArray: drag ? '5 5' : null });
+    }
     else if (w.kind === 'conn') layer = L.polyline(ll, { renderer, color: '#7b8fa3', weight: 2, dashArray: '4 4', opacity: 0.8 });
     else layer = L.polyline(ll, { renderer, color: DIFF_COLOR[w.diff] || '#d42a2a', weight: 3.5, opacity: 0.85 });
     if (w.kind !== 'area') {
       const b = wayBadge(w);
-      layer.bindPopup(`<b>${esc(wayLabel(w))}</b><br><span style="color:#567">${esc(w.kind === 'lift' ? liftKind(w) : (w.ref ? `nr ${w.ref} · ` : '') + (DIFF_PL[w.diff] || b.txt.toLowerCase()))} · ${fmtDist(w.len)}${w.kind === 'lift' ? ' · ~' + fmtMin(w.len / w.speed) : ''}</span>`);
+      layer.bindPopup(`<b>${esc(wayLabel(w))}</b><br><span style="color:#567">${esc(w.kind === 'lift' ? liftKind(w) : (w.ref ? `nr ${w.ref} · ` : '') + (DIFF_PL[w.diff] || b.txt.toLowerCase()))} · ${fmtDist(w.len)}${w.kind === 'lift' ? ' · jazda ok. ' + fmtMin(w.len / w.speed) : ''}</span>`);
     }
     netLayer.addLayer(layer);
   }
@@ -132,7 +142,7 @@ function drawArrows() {
   const lines = { };
   for (const w of S.net.ways) {
     if (w.kind === 'area' || w.kind === 'conn' || w.len < gap * 0.8) continue;
-    const color = w.kind === 'lift' ? '#22313f' : (DIFF_COLOR[w.diff] || '#d42a2a');
+    const color = w.kind === 'lift' ? LIFT_COLOR : (DIFF_COLOR[w.diff] || '#d42a2a');
     const out = lines[color] || (lines[color] = []);
     for (let d = gap / 2; d < w.len; d += gap) {
       let i = 0; while (i < w.cum.length - 2 && w.cum[i + 1] < d) i++;
@@ -173,7 +183,8 @@ function drawLabels() {
     if (lift) {
       key = 'L' + w.wi;
       const kind = LIFT_SHORT[w.sub] || 'WYCIĄG', occ = w.occ > 1 && /chair|mixed/.test(w.sub) ? ' ' + w.occ : '';
-      html = `<div class="lbl lift"><b>${kind}${occ}</b>${z >= 16 && w.name ? ' ' + esc(w.name) : ''}</div>`;
+      const ride = Math.max(1, Math.round(w.len / w.speed / 60));
+      html = `<div class="lbl lift"><b>${kind}${occ}</b> · ${ride} min${z >= 16 && w.name ? ' · ' + esc(w.name) : ''}</div>`;
     } else {
       key = 'P' + (w.ref || w.name);
       const txt = w.ref || w.name;
@@ -187,7 +198,7 @@ function drawLabels() {
       const p = map.latLngToContainerPoint(ll);
       const same = byText.get(key) || [];
       if (!lift && same.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 220)) continue;
-      if (!free(p, lift ? 46 : 30)) continue;
+      if (!free(p, lift ? 52 : 30)) continue;
       placed.push(p); same.push(p); byText.set(key, same);
       labelLayer.addLayer(L.marker(ll, { icon: L.divIcon({ className: 'lblwrap', html, iconSize: null }), interactive: false, keyboard: false, zIndexOffset: -100 }));
     }
@@ -272,7 +283,7 @@ async function onMessage(topic, payload) {
   if (id === S.me.id) return;
   const cur = S.friends.get(id);
   if (cur && cur.t >= m.t) return;
-  S.friends.set(id, { id, name: String(m.n || '?').slice(0, 20), full: String(m.fn || '').slice(0, 40), act: ['pre', 'ski', 'off', 'done'].includes(m.a) ? m.a : null, color: COLORS.includes(m.c) ? m.c : COLORS[0], status: m.s || 'ride', t: +m.t || 0, pos: m.p.map(Number), track: Array.isArray(m.tr) ? m.tr.map(p => p.map(Number)) : [] });
+  S.friends.set(id, { id, name: String(m.n || '?').slice(0, 20), full: String(m.fn || '').slice(0, 40), act: ['pre', 'ski', 'off', 'done'].includes(m.a) ? m.a : null, color: COLORS.includes(m.c) || OLD_COLORS.includes(m.c) ? m.c : COLORS[0], status: m.s || 'ride', t: +m.t || 0, pos: m.p.map(Number), track: Array.isArray(m.tr) ? m.tr.map(p => p.map(Number)) : [] });
   for (const h of HOOK.friend) try { h(S.friends.get(id), m, cur); } catch (err) { console.error(err); }
   tick();
 }
@@ -435,6 +446,7 @@ function drawMe() {
   const ll = [S.myPos[0], S.myPos[1]];
   if (!meMarker) {
     meMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [22, 22] }), zIndexOffset: 1000, keyboard: false }).addTo(map).bindTooltip('Ty', { direction: 'top', offset: [0, -10] });
+    meMarker.on('click', () => HOOK.meClick?.());
     meAcc = L.circle(ll, { radius: S.myPos[3] || 10, renderer, color: '#1a73e8', weight: 1, fillOpacity: 0.08, interactive: false }).addTo(map);
   } else { meMarker.setLatLng(ll); meAcc.setLatLng(ll).setRadius(Math.min(S.myPos[3] || 10, 300)); }
 }
@@ -545,6 +557,7 @@ function drawMarkers(fr) {
 
 function drawPredictions(fr) {
   predLayer.clearLayers();
+  if (S.view) return;   // my day / history on the map: keep it clean
   for (const f of fr) {
     const p = S.preds.get(f.id); if (!p || p.age > 900) continue;
     const sel = S.selected === f.id;
@@ -574,7 +587,7 @@ function computePlan() {
 }
 
 function select(id) {
-  S.selected = id; S.sheetOpen = true;
+  S.selected = id; S.view = null; S.sheetOpen = true;
   const f = S.friends.get(id);
   tick(true);
   if (f) {
@@ -585,7 +598,7 @@ function select(id) {
     map.fitBounds(pts, { paddingTopLeft: [40, 80], paddingBottomRight: [40, sheetH() + 40], maxZoom: 16 });
   }
 }
-function deselect() { S.selected = null; S.plan = null; routeLayer.clearLayers(); tick(true); }
+function deselect() { S.selected = null; S.plan = null; S.view = null; routeLayer.clearLayers(); tick(true); }
 
 const arrowSvg = deg => `<svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${deg}deg)"><path d="M12 3l6 16-6-4-6 4z" fill="currentColor"/></svg>`;
 function sheetH() { return $('#sheet').getBoundingClientRect().height; }
@@ -595,7 +608,8 @@ function renderSheet(fr, force) {
   const scrollEl = body.querySelector('.list,.detail'), scroll = scrollEl ? scrollEl.scrollTop : 0;
   $('#sheet').classList.toggle('open', S.sheetOpen);
   let html;
-  if (S.selected && S.friends.has(S.selected)) html = detailHtml(S.friends.get(S.selected));
+  if (S.view && HOOK.view) html = HOOK.view();
+  else if (S.selected && S.friends.has(S.selected)) html = detailHtml(S.friends.get(S.selected));
   else { S.selected = null; html = listHtml(fr); }
   const typing = document.activeElement?.tagName === 'INPUT' && document.activeElement.closest('#sheetBody');
   if (html !== renderSheet.last && !typing && !(Date.now() < (renderSheet.holdUntil || 0) && !force)) {
@@ -612,8 +626,10 @@ function statusTag(s, act) {
   if (s === 'wait') return '<span class="tag wait">czeka</span>'; if (s === 'hut') return '<span class="tag">schronisko</span>'; if (s === 'done') return '<span class="tag">koniec</span>'; return ''; }
 
 function listHtml(fr) {
-  const my = S.me?.status || 'ride';
-  const status = `<div class="statusbar" role="group" aria-label="Mój status">${STATUSES.map(([k, l]) => `<button data-status="${k}" class="${my === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  // My status is one small pill; the choices open only when tapped.
+  const my = S.me?.status || 'ride', myL = (STATUSES.find(x => x[0] === my) || STATUSES[0])[1];
+  const pill = `<button class="stpill ${my}" data-act="statusmenu" aria-expanded="${!!S.statusOpen}">${esc(myL)} <span aria-hidden="true">▾</span></button>`;
+  const status = S.statusOpen ? `<div class="statusbar" role="group" aria-label="Mój status">${STATUSES.map(([k, l]) => `<button data-status="${k}" class="${my === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
   const away = f => (f.act === 'pre' || f.act === 'done') ? 1 : 0;
   fr.sort((a, b) => away(a) - away(b) || (distTo(a) ?? 1e9) - (distTo(b) ?? 1e9));
   let rows = fr.map(f => {
@@ -629,7 +645,7 @@ function listHtml(fr) {
   const tabs = `<div class="tabs" role="tablist"><button data-act="tab" data-tab="crew" class="${S.tab !== 'rank' ? 'on' : ''}">Ekipa <span class="count">${fr.length}</span></button><button data-act="tab" data-tab="rank" class="${S.tab === 'rank' ? 'on' : ''}">Ranking dnia</button></div>`;
   if (S.tab === 'rank' && HOOK.rank) return tabs + `<div class="list">${HOOK.rank()}</div>`;
   const top = HOOK.top.map(h => { try { return h(); } catch (err) { console.error(err); return ''; } }).join('');
-  return tabs + `<h2 class="me-line">${S.myPos ? `Ty: ${ACT_PL[S.act]}${S.me?.share === false ? ' · nie udostępniasz pozycji' : (S.me?.hideUntil || 0) > Date.now() ? ' · ukryty do ' + new Date(S.me.hideUntil).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : ''}` : 'Brak Twojej pozycji'}</h2>${status}<div class="list">${top}${rows}</div>`;
+  return tabs + `<h2 class="me-line">${pill}<span>${S.myPos ? `Ty: ${ACT_PL[S.act]}${S.me?.share === false ? ' · nie udostępniasz pozycji' : (S.me?.hideUntil || 0) > Date.now() ? ' · ukryty do ' + new Date(S.me.hideUntil).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : ''}` : 'Brak Twojej pozycji'}</span></h2>${status}<div class="list">${top}${rows}${HOOK.listEnd?.() || ''}</div>`;
 }
 
 function detailHtml(f) {
@@ -677,11 +693,12 @@ function nodeLabel(n) {
 $('#sheetBody').addEventListener('click', e => {
   const row = e.target.closest('[data-id]'); if (row) { select(row.dataset.id); return; }
   const st = e.target.closest('[data-status]');
-  if (st) { S.me.status = st.dataset.status; saveMe(); publish(true); tick(); toast('Status: ' + st.textContent); return; }
+  if (st) { S.me.status = st.dataset.status; S.statusOpen = false; saveMe(); publish(true); tick(true); toast('Status: ' + st.textContent); return; }
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (act === 'back') deselect();
   else if (act === 'center') { const f = S.friends.get(S.selected); if (f) { S.follow = false; map.setView([f.pos[0], f.pos[1]], 16); } }
   else if (act === 'demo') { S.me.demo = true; saveMe(); applyMode(); }
+  else if (act === 'statusmenu') { S.statusOpen = !S.statusOpen; tick(true); }
   else if (act === 'tab') { S.tab = e.target.closest('[data-tab]').dataset.tab; tick(true); }
   else if (HOOK.act[act]) HOOK.act[act](e.target.closest('[data-act]'));
 });
@@ -739,8 +756,9 @@ function openSetup() {
   const fromLink = (location.hash.match(/^#g-([a-z0-9-]{3,40})$/) || [])[1];
   let color = COLORS[Math.floor(Math.random() * COLORS.length)];
   colorPicker($('#inColors'), color, c => { color = c; });
-  $('#inGroup').value = fromLink || genCode();
-  $('#btnGen').onclick = () => { $('#inGroup').value = genCode(); };
+  let generated = fromLink ? '' : genCode();   // a new code made here = a new group, so this person becomes its admin
+  $('#inGroup').value = fromLink || generated;
+  $('#btnGen').onclick = () => { $('#inGroup').value = generated = genCode(); };
   $('#setup').hidden = false;
   if (!NATIVE) setTimeout(() => $('#inNick').focus(), 50);
   $('#setupForm').onsubmit = async e => {
@@ -749,7 +767,7 @@ function openSetup() {
     const group = $('#inGroup').value.trim().toLowerCase();
     if (!nick && !first) { toast('Wpisz ksywkę albo imię'); $('#inNick').focus(); return; }
     if (group.length < 4) { toast('Kod grupy musi mieć co najmniej 4 znaki'); return; }
-    S.me = { id: crypto.randomUUID ? crypto.randomUUID() : hex(crypto.getRandomValues(new Uint8Array(16))), nick, first, last, color, group, status: 'ride', share: true, wake: true, demo: false };
+    S.me = { id: crypto.randomUUID ? crypto.randomUUID() : hex(crypto.getRandomValues(new Uint8Array(16))), nick, first, last, color, group, status: 'ride', share: true, wake: true, demo: false, founder: group === generated };
     saveMe();
     $('#setup').hidden = true;
     await start();
@@ -801,7 +819,7 @@ $('#btnCopy').onclick = async () => {
 $('#btnLeave').onclick = () => {
   const b = $('#btnLeave');
   if (!b.dataset.confirm) { b.dataset.confirm = '1'; b.textContent = 'Na pewno? Kliknij jeszcze raz'; setTimeout(() => { delete b.dataset.confirm; b.textContent = 'Opuść grupę'; }, 4000); return; }
-  clearMine(); setTimeout(() => { disconnect(); stopGps(); stopDemo(); LS.del('ek.me'); location.hash = ''; location.reload(); }, 600);
+  clearMine(); for (const h of HOOK.leave) try { h(); } catch {} setTimeout(() => { disconnect(); stopGps(); stopDemo(); LS.del('ek.me'); location.hash = ''; location.reload(); }, 600);
 };
 $('#btnNetResort').onclick = () => { $('#settings').hidden = true; loadNet(RESORT.bbox, RESORT.center, 'Madonna di Campiglio', true); };
 $('#btnNetHere').onclick = () => {

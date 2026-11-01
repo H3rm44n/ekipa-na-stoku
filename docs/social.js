@@ -1,8 +1,7 @@
 'use strict';
-/* Meetings with RSVP + guidance, SOS, quick messages, hiding, huts on the map, notifications. */
+/* Meetings with RSVP + guidance, SOS, hiding, huts on the map, notifications. */
 
 const hhmm = t => new Date(t).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
-const QUICK = ['Czekam na dole', 'Idę na obiad', 'Ostatni zjazd', 'Gdzie jesteście?', 'Jadę do was'];
 
 /* ---------- notifications ---------- */
 const Notif = NATIVE ? window.Capacitor.registerPlugin('LocalNotifications') : null;
@@ -187,7 +186,7 @@ function meetCards() {
       <div class="actions">
         ${mine ? '' : `<button class="btn sm ${my === 'y' ? 'primary' : ''}" data-act="ans" data-id="${m.id}" data-v="y">Będę</button><button class="btn sm ${my === 'n' ? 'dark' : ''}" data-act="ans" data-id="${m.id}" data-v="n">Nie dam rady</button>`}
         <button class="btn sm" data-act="meetnav" data-id="${m.id}">Prowadź</button>
-        ${mine ? `<button class="btn sm danger" data-act="meetcancel" data-id="${m.id}">Odwołaj</button>` : ''}
+        ${mine || isAdmin() ? `<button class="btn sm danger" data-act="meetcancel" data-id="${m.id}">Odwołaj</button>` : ''}
       </div></div>`;
   }).join('');
 }
@@ -300,6 +299,15 @@ function setSos(on) {
   setGpsMode(true); publish(true); tick(true);
 }
 HOOK.act.sos = () => { sosConfirm = true; tick(true); };
+// The SOS button sits under the settings button; it opens the confirmation at the top of the list.
+$('#btnSos').onclick = () => {
+  if (!S.me) return;
+  S.selected = null; S.view = null; S.tab = 'crew'; S.sheetOpen = true;
+  if (!S.sos) sosConfirm = true;
+  tick(true);
+  const l = $('#sheetBody .list'); if (l) l.scrollTop = 0;
+};
+HOOK.tick.push(() => $('#btnSos').classList.toggle('on', !!S.sos || visibleFriends().some(f => f.sos)));
 HOOK.act.sosyes = () => setSos(true);
 HOOK.act.sosno = () => { sosConfirm = false; tick(true); };
 HOOK.act.sosoff = () => setSos(false);
@@ -318,26 +326,6 @@ const sosLayer = L.layerGroup().addTo(map);
 function drawSos() {
   sosLayer.clearLayers();
   for (const f of visibleFriends()) if (f.sos) sosLayer.addLayer(L.circleMarker([f.pos[0], f.pos[1]], { renderer, radius: 26, color: '#dc2626', weight: 4, fillColor: '#dc2626', fillOpacity: 0.15, interactive: false }));
-}
-
-/* ---------- quick messages ---------- */
-S.qm = LS.get('ek.qm', null);
-let qmOpen = false;
-HOOK.out.push(() => (S.qm && Date.now() - S.qm.t < 30 * 60e3 ? { qm: S.qm } : {}));
-HOOK.friend.push((f, m, prev) => {
-  f.qm = m.qm && typeof m.qm.x === 'string' && Date.now() - m.qm.t < 30 * 60e3 ? { x: m.qm.x.slice(0, 80), t: +m.qm.t } : null;
-  if (f.qm && (!prev?.qm || prev.qm.t !== f.qm.t)) notify(f.name, f.qm.x);
-});
-function sendQuick(x) { S.qm = { x: x.slice(0, 80), t: Date.now() }; LS.set('ek.qm', S.qm); qmOpen = false; publish(true); tick(true); toast('Wysłano: ' + S.qm.x); }
-HOOK.act.qm = () => { qmOpen = !qmOpen; tick(true); };
-HOOK.act.qmsend = el => sendQuick(el.dataset.x);
-HOOK.act.qmcustom = () => { const v = $('#qmText')?.value.trim(); if (v) sendQuick(v); };
-function quickCard() {
-  const recent = visibleFriends().filter(f => f.qm).sort((a, b) => b.qm.t - a.qm.t).slice(0, 4)
-    .map(f => `<div class="qmrow"><span class="dotc" style="background:${f.color}"></span><b>${esc(f.name)}:</b> „${esc(f.qm.x)}” <span class="small">${agoTxt(f.qm.t)}</span></div>`).join('');
-  const panel = qmOpen ? `<div class="card"><div class="opts">${QUICK.map(x => `<button class="btn sm" data-act="qmsend" data-x="${esc(x)}">${esc(x)}</button>`).join('')}</div>
-    <div class="rowflex" style="margin-top:8px"><input type="text" id="qmText" maxlength="80" placeholder="Własna wiadomość"><button class="btn sm primary" data-act="qmcustom">Wyślij</button></div></div>` : '';
-  return (recent ? `<div class="card msgs">${recent}</div>` : '') + panel;
 }
 
 /* ---------- hide for a while ---------- */
@@ -363,8 +351,9 @@ HOOK.friend.push(f => {
 /* ---------- cards above the list ---------- */
 HOOK.top.unshift(() => {
   const hidden = (S.me?.hideUntil || 0) > Date.now();
-  const bar = `<div class="actbar"><button class="btn sm sosbtn" data-act="sos">SOS</button><button class="btn sm primary" data-act="navpick">Prowadź do…</button><button class="btn sm" data-act="qm">Wiadomość</button>${hidden ? `<button class="btn sm" data-act="unhide">Pokaż mnie</button>` : ''}<span class="small hint">Przytrzymaj mapę, żeby zaproponować spotkanie</span></div>`;
-  return sosCards() + navCard() + meetCards() + bar + pickCard() + quickCard();
+  const unread = chatUnread();
+  const bar = `<div class="actbar"><button class="btn sm dark" data-act="chat">Czat${unread ? `<span class="badge">${unread}</span>` : ''}</button>${hidden ? `<button class="btn sm" data-act="unhide">Pokaż mnie</button>` : ''}<span class="grow"></span><button class="btn sm primary" data-act="navpick">Prowadź do…</button></div>`;
+  return sosCards() + navCard() + meetCards() + bar + chatPreview() + pickCard();
 });
 
 HOOK.netReady.push(askNotifications);

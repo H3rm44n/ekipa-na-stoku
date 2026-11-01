@@ -49,34 +49,35 @@ function statsOnPos(p, now) {
 }
 
 /* ---------- today's track ---------- */
+// Point: [lat, lon, alt, time, mode, speed*10]; mode l = lift, s = skiing, o = other (standing, walking, hut).
 let dayTrack = LS.get('ek.track', null);
+const prevDay = { track: dayTrack, st: LS.get('ek.day', null) };   // yesterday's track goes to the history (history.js)
 if (!dayTrack || dayTrack.date !== todayKey()) dayTrack = { date: todayKey(), pts: [] };
 let trackDirty = 0;
+function trackMode() {
+  const state = S.myPred?.state;
+  if (state === 'lift') return 'l';
+  return S.act === 'ski' && (state === 'piste' || state === 'move') ? 's' : 'o';
+}
 function trackPush(p, now) {
-  if (dayTrack.date !== todayKey()) dayTrack = { date: todayKey(), pts: [] };
+  if (dayTrack.date !== todayKey()) { if (typeof archiveDay === 'function') archiveDay(dayTrack, { ...dayStats() }); dayTrack = { date: todayKey(), pts: [] }; }
   if ((p[3] ?? 999) > 50) return;
-  const last = dayTrack.pts[dayTrack.pts.length - 1];
-  if (last && haversine(last, p) < 15 && now - last[3] < 60e3) return;
-  dayTrack.pts.push([+p[0].toFixed(6), +p[1].toFixed(6), p[2] == null ? null : Math.round(p[2]), now]);
-  if (dayTrack.pts.length > 8000) dayTrack.pts.splice(0, 1000);
-  if (++trackDirty >= 10) { trackDirty = 0; LS.set('ek.track', dayTrack); }
-  if (trackLine) trackLine.addLatLng([p[0], p[1]]);
+  const last = dayTrack.pts[dayTrack.pts.length - 1], mode = trackMode();
+  if (last && last[4] === mode && haversine(last, p) < 15 && now - last[3] < 60e3) return;
+  const v = p[4] != null && p[4] >= 0 && p[4] < MAX_SPEED ? Math.round(p[4] * 10) : null;
+  dayTrack.pts.push([+p[0].toFixed(6), +p[1].toFixed(6), p[2] == null ? null : Math.round(p[2]), now, mode, v]);
+  if (dayTrack.pts.length > 12000) dayTrack.pts.splice(0, 1000);
+  if (++trackDirty >= 10) { trackDirty = 0; saveTrack(); }
 }
-window.addEventListener('pagehide', () => LS.set('ek.track', dayTrack));
-document.addEventListener('visibilitychange', () => { if (document.hidden) LS.set('ek.track', dayTrack); });
+function saveTrack() { LS.set('ek.track', dayTrack); if (typeof saveToday === 'function') saveToday(); }
+window.addEventListener('pagehide', saveTrack);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveTrack(); });
 
-let trackLine = null;
-function toggleTrack() {
-  if (trackLine) { map.removeLayer(trackLine); trackLine = null; return; }
-  if (dayTrack.pts.length < 2) { toast('Ślad pojawi się po pierwszych zjazdach'); return; }
-  trackLine = L.polyline(dayTrack.pts.map(p => [p[0], p[1]]), { renderer, color: '#1a73e8', weight: 4, opacity: 0.75, interactive: false }).addTo(map);
-  map.fitBounds(trackLine.getBounds(), { padding: [40, 40] });
-}
-async function exportGpx() {
-  if (dayTrack.pts.length < 2) { toast('Brak śladu do zapisania'); return; }
-  const pts = dayTrack.pts.map(p => `<trkpt lat="${p[0]}" lon="${p[1]}">${p[2] != null ? `<ele>${p[2]}</ele>` : ''}<time>${new Date(p[3]).toISOString()}</time></trkpt>`).join('');
-  const gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Ekipa na Stoku" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Narty ${dayTrack.date}</name><trkseg>${pts}</trkseg></trk></gpx>`;
-  const name = `narty-${dayTrack.date}.gpx`;
+async function exportGpx(track = dayTrack) {
+  if (track.pts.length < 2) { toast('Brak śladu do zapisania'); return; }
+  const pts = track.pts.map(p => `<trkpt lat="${p[0]}" lon="${p[1]}">${p[2] != null ? `<ele>${p[2]}</ele>` : ''}<time>${new Date(p[3]).toISOString()}</time></trkpt>`).join('');
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Ekipa na Stoku" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Narty ${track.date}</name><trkseg>${pts}</trkseg></trk></gpx>`;
+  const name = `narty-${track.date}.gpx`;
   const file = new File([gpx], name, { type: 'application/gpx+xml' });
   try { if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; } } catch (e) { if (e?.name === 'AbortError') return; }
   const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.append(a); a.click(); a.remove();
@@ -102,10 +103,8 @@ function myDayCard() {
       <div><b>${st.runs}</b><span>zjazdów</span></div>
     </div>
     <div class="small">${Math.round(st.vertM).toLocaleString('pl-PL')} m w dół · razem ${km(st.skiM + st.liftM)} km</div>
-    <div class="actions"><button class="btn sm" data-act="track">${trackLine ? 'Ukryj ślad' : 'Mój ślad dziś'}</button><button class="btn sm" data-act="gpx">Zapisz GPX</button></div></div>`;
+    <div class="actions"><button class="btn sm primary" data-act="day" data-d="${todayKey()}">Przebieg dnia</button><button class="btn sm" data-act="days">Historia dni</button></div></div>`;
 }
-HOOK.act.track = () => { toggleTrack(); tick(true); };
-HOOK.act.gpx = exportGpx;
 
 HOOK.rank = () => {
   const me = { id: 'me', name: displayName(S.me) + ' (Ty)', color: S.me.color, st: dayStats() };
