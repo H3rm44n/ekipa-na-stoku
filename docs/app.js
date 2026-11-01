@@ -10,17 +10,18 @@ const LS = {
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const RESORT = { name: 'Madonna di Campiglio · Pinzolo · Folgarida-Marilleva', center: [46.2297, 10.8263], bbox: [46.13, 10.68, 46.36, 10.97] };
-const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+// Message servers. For the App Store build put a private broker first (url + username/password).
+const BROKERS = [{ url: 'wss://broker.hivemq.com:8884/mqtt' }, { url: 'wss://broker.emqx.io:8084/mqtt' }];
 const COLORS = ['#ff6b00', '#d6249f', '#16a34a', '#0f766e', '#eab308', '#0891b2', '#a16207', '#e11d48'];
 const OLD_COLORS = ['#7c3aed'];   // still accepted from friends on older versions
 // Lifts get their own colour so they never look like a black piste.
 const LIFT_COLOR = '#7b2fbe';
-const STATUSES = [['ride', 'Jeżdżę'], ['wait', 'Czekam na was'], ['hut', 'W schronisku'], ['done', 'Kończę']];
+const STATUSES = ['ride', 'wait', 'hut', 'done'].map(k => [k, t('st.' + k)]);
 const MAX_AGE_SHOW = 8 * 3600e3;
 // How often a position goes out per GPS mode. Fewer sends = radio sleeps more = less battery.
 const MODE_PUB = { active: 8000, lift: 15000, idle: 45000, saver: 180000 };
-const MODE_PL = { active: 'dokładny (jazda)', lift: 'średni (wyciąg)', idle: 'oszczędny (postój)', saver: 'minimalny (poza stokiem)' };
-const ACT_PL = { pre: 'przed jazdą', ski: 'na stoku', off: 'poza stokiem', done: 'koniec jazdy' };
+const MODE_PL = tmap(['active', 'lift', 'idle', 'saver'], 'mode.');
+const ACT_PL = tmap(['pre', 'ski', 'off', 'done'], 'myact.');
 const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 function loadDay() { const d = LS.get('ek.day', null); return d && d.date === todayKey() ? d : { date: todayKey(), skied: 0, lastOn: 0 }; }
 const displayName = m => (m?.nick || '').trim() || (m?.first || '').trim() || (m?.name || '').trim() || '?';
@@ -64,10 +65,16 @@ async function pubTopic(kind, id, obj, retain = true) {
 
 /* ---------- map ---------- */
 const map = L.map('map', { zoomControl: false, preferCanvas: true, tap: true }).setView(RESORT.center, 13);
-const baseLayers = [
-  ['Topo', L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 17, maxNativeZoom: 17, attribution: '© współtwórcy <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, SRTM · © OpenTopoMap (CC-BY-SA)' })],
-  ['Satelita', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri, Maxar, Earthstar Geographics' })],
-  ['OSM', L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© współtwórcy <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' })],
+// Base maps. With a MapTiler key (App Store build) both maps come from MapTiler under its terms;
+// without one: OpenTopoMap (CC-BY-SA, light use) and Esri imagery.
+const MAPTILER_KEY = '';
+const OSM_ATTR = `<a href="https://www.openstreetmap.org/copyright">${t('map.osm')}</a>`;
+const baseLayers = MAPTILER_KEY ? [
+  [t('map.topo'), L.tileLayer(`https://api.maptiler.com/maps/winter-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, { maxZoom: 18, attribution: `© MapTiler ${OSM_ATTR}` })],
+  [t('map.sat'), L.tileLayer(`https://api.maptiler.com/maps/satellite/256/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`, { maxZoom: 19, attribution: `© MapTiler ${OSM_ATTR}` })],
+] : [
+  [t('map.topo'), L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 17, maxNativeZoom: 17, attribution: `${OSM_ATTR}, SRTM · © OpenTopoMap (CC-BY-SA)` })],
+  [t('map.sat'), L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri, Maxar, Earthstar Geographics' })],
 ];
 let baseIdx = LS.get('ek.base', 0) % baseLayers.length;
 baseLayers[baseIdx][1].addTo(map);
@@ -84,18 +91,18 @@ let meMarker = null, meAcc = null;
 map.on('dragstart', () => { S.follow = false; });
 map.on('contextmenu', e => {
   if (HOOK.longpress) HOOK.longpress(e.latlng);
-  else if (S.me?.demo) { setMyPos([e.latlng.lat, e.latlng.lng, null, 5, 0, null], true); toast('Ustawiono Twoją pozycję (demo)'); }
+  else if (S.me?.demo) { setMyPos([e.latlng.lat, e.latlng.lng, null, 5, 0, null], true); toast(t('t.demoPos')); }
 });
 
 $('#btnLayers').onclick = () => {
   map.removeLayer(baseLayers[baseIdx][1]);
   baseIdx = (baseIdx + 1) % baseLayers.length;
   baseLayers[baseIdx][1].addTo(map); baseLayers[baseIdx][1].bringToBack();
-  LS.set('ek.base', baseIdx); toast('Mapa: ' + baseLayers[baseIdx][0]);
+  LS.set('ek.base', baseIdx); toast(t('t.map', { name: baseLayers[baseIdx][0] }));
 };
 $('#btnMe').onclick = () => {
   if (S.myPos) { S.follow = true; map.setView([S.myPos[0], S.myPos[1]], Math.max(map.getZoom(), 15)); }
-  else toast(S.gpsError || 'Czekam na sygnał GPS…');
+  else toast(S.gpsError || t('t.waitGps'));
 };
 $('#btnFit').onclick = fitAll;
 function fitAll() {
@@ -125,7 +132,7 @@ function drawNet() {
     else layer = L.polyline(ll, { renderer, color: DIFF_COLOR[w.diff] || '#d42a2a', weight: 3.5, opacity: 0.85 });
     if (w.kind !== 'area') {
       const b = wayBadge(w);
-      layer.bindPopup(`<b>${esc(wayLabel(w))}</b><br><span style="color:#567">${esc(w.kind === 'lift' ? liftKind(w) : (w.ref ? `nr ${w.ref} · ` : '') + (DIFF_PL[w.diff] || b.txt.toLowerCase()))} · ${fmtDist(w.len)}${w.kind === 'lift' ? ' · jazda ok. ' + fmtMin(w.len / w.speed) : ''}</span>`);
+      layer.bindPopup(`<b>${esc(wayLabel(w))}</b><br><span style="color:#567">${esc(w.kind === 'lift' ? liftKind(w) : (w.ref ? t('pop.ref', { ref: w.ref }) + ' · ' : '') + (DIFF_PL[w.diff] || b.txt.toLowerCase()))} · ${fmtDist(w.len)}${w.kind === 'lift' ? ' · ' + t('pop.ride', { t: fmtMin(w.len / w.speed) }) : ''}</span>`);
     }
     netLayer.addLayer(layer);
   }
@@ -165,7 +172,7 @@ function drawArrows() {
 }
 
 // Piste numbers (like the signs on the slope) and lift types, placed so they don't pile up.
-const LIFT_SHORT = { cable_car: 'KOLEJ', gondola: 'GONDOLA', mixed_lift: 'GONDOLA', chair_lift: 'KRZESŁO', drag_lift: 'ORCZYK', 't-bar': 'ORCZYK', 'j-bar': 'ORCZYK', platter: 'TALERZYK', rope_tow: 'LINKA', magic_carpet: 'TAŚMA' };
+const LIFT_SHORT = tmap(Object.keys(LIFT_SPEED), 'ls.');
 const DIFF_CLS = { novice: 'nov', easy: 'easy', intermediate: 'inter', advanced: 'adv', expert: 'adv', freeride: 'free' };
 function drawLabels() {
   labelLayer.clearLayers();
@@ -182,7 +189,7 @@ function drawLabels() {
     let html, key;
     if (lift) {
       key = 'L' + w.wi;
-      const kind = LIFT_SHORT[w.sub] || 'WYCIĄG', occ = w.occ > 1 && /chair|mixed/.test(w.sub) ? ' ' + w.occ : '';
+      const kind = LIFT_SHORT[w.sub] || t('ls.lift'), occ = w.occ > 1 && /chair|mixed/.test(w.sub) ? ' ' + w.occ : '';
       const ride = Math.max(1, Math.round(w.len / w.speed / 60));
       html = `<div class="lbl lift"><b>${kind}${occ}</b> · ${ride} min${z >= 16 && w.name ? ' · ' + esc(w.name) : ''}</div>`;
     } else {
@@ -206,15 +213,19 @@ function drawLabels() {
 }
 map.on('zoomend moveend', () => { if (!document.hidden) { drawArrows(); drawLabels(); } });
 
+let bundled = null;
+function bundledResort() { return bundled || (bundled = fetch('data/skirama.json').then(r => (r.ok ? r.json() : null)).catch(() => null)); }
 async function loadNet(bbox, center, label, force) {
   const key = 'ek.net2:' + bbox.join(',');
   try { for (const k of Object.keys(localStorage)) if (k.startsWith('ek.net:')) LS.del(k); } catch {}   // old format without lift details
   let data = !force && LS.get(key, null);
+  // The home resort ships with the app (works offline, no wait for OpenStreetMap); "reload" fetches fresh data.
+  if (!data && !force && bbox.join() === RESORT.bbox.join()) data = (await bundledResort())?.net || null;
   if (!data) {
-    showBanner('Pobieram mapę tras i wyciągów z OpenStreetMap…');
+    showBanner(t('b.loadNet'));
     try { data = await fetchSkiData(bbox); }
     catch (err) {
-      showBanner('Nie udało się pobrać tras. Sprawdź internet.', 'Ponów', () => loadNet(bbox, center, label, true));
+      showBanner(t('b.netFail'), t('b.retry'), () => loadNet(bbox, center, label, true));
       return;
     }
     if (!LS.set(key, data)) { for (const k of Object.keys(localStorage)) if (k.startsWith('ek.net2:') && k !== key) LS.del(k); LS.set(key, data); }
@@ -225,7 +236,7 @@ async function loadNet(bbox, center, label, force) {
   hideBanner();
   drawNet(); drawArrows(); drawLabels();
   const lifts = S.net.ways.filter(w => w.kind === 'lift').length, pistes = S.net.ways.filter(w => w.kind === 'piste').length;
-  $('#stNet').textContent = `${label}: ${pistes} odcinków tras, ${lifts} wyciągów.`;
+  $('#stNet').textContent = t('st.net', { label, p: pistes, l: lifts });
   if (S.me?.demo) startDemo();
   tick(true);
 }
@@ -254,8 +265,8 @@ const conns = [];
 function connect() {
   disconnect();
   if (typeof mqtt === 'undefined') { setConn(); return; }
-  for (const url of BROKERS) {
-    const c = mqtt.connect(url, { clientId: 'ek_' + S.me.id.slice(0, 10) + '_' + Math.random().toString(36).slice(2, 6), reconnectPeriod: 4000, connectTimeout: 12000, keepalive: 60, clean: true });
+  for (const { url, username, password } of BROKERS) {
+    const c = mqtt.connect(url, { username, password, clientId: 'ek_' + S.me.id.slice(0, 10) + '_' + Math.random().toString(36).slice(2, 6), reconnectPeriod: 4000, connectTimeout: 12000, keepalive: 60, clean: true });
     c.on('connect', () => { c.subscribe(G.topic + '/+/+', { qos: 0 }); setConn(); publish(true); });
     c.on('close', setConn); c.on('offline', setConn); c.on('error', () => {});
     c.on('message', (topic, payload) => onMessage(topic, payload));
@@ -267,11 +278,11 @@ function disconnect() { while (conns.length) { try { conns.pop().end(true); } ca
 function setConn() {
   const up = conns.filter(c => c.connected).length;
   $('#connDot').className = 'dot ' + (up === 0 ? 'off' : up < conns.length ? 'half' : 'on');
-  $('#connTxt').textContent = up ? 'online' : 'offline';
+  $('#connTxt').textContent = up ? t('conn.on') : t('conn.off');
 }
 $('#connChip').onclick = () => {
   const up = conns.filter(c => c.connected).length;
-  toast(up ? `Połączono z ${up}/${conns.length} serwerami` : 'Brak połączenia – pozycje wyślą się, gdy wróci zasięg');
+  toast(up ? t('t.conn', { up, all: conns.length }) : t('t.noconn'));
 };
 
 async function onMessage(topic, payload) {
@@ -313,15 +324,15 @@ let watchId = null, nativeListeners = false;
 function startGps() {
   if (S.me?.demo) return;
   if (NATIVE) { startNativeGps(); return; }
-  if (!('geolocation' in navigator)) { S.gpsError = 'Ten telefon nie udostępnia GPS przeglądarce.'; showBanner(S.gpsError); return; }
+  if (!('geolocation' in navigator)) { S.gpsError = t('gps.noBrowser'); showBanner(S.gpsError); return; }
   if (watchId != null) return;
-  showBanner('Czekam na sygnał GPS… zezwól na lokalizację.');
+  showBanner(t('gps.wait'));
   watchId = navigator.geolocation.watchPosition(p => {
     S.gpsError = null;
     const c = p.coords;
     setMyPos([c.latitude, c.longitude, c.altitude, c.accuracy, c.speed, c.heading]);
   }, err => {
-    S.gpsError = err.code === 1 ? 'Brak zgody na lokalizację. Włącz ją dla tej strony w ustawieniach przeglądarki.' : 'Nie mogę ustalić pozycji (słaby sygnał GPS).';
+    S.gpsError = err.code === 1 ? t('gps.deniedWeb') : t('gps.weak');
     if (!S.myPos || err.code === 1) showBanner(S.gpsError);
   }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 30000 });
 }
@@ -335,14 +346,14 @@ async function startNativeGps() {
     Loc.addListener('location', l => { S.gpsError = null; setMyPos([l.latitude, l.longitude, l.altitude, l.accuracy, l.speed, l.bearing]); });
     Loc.addListener('error', e => {
       if (e.code !== 'NOT_AUTHORIZED') return;
-      S.gpsError = 'Brak zgody na lokalizację. Włącz ją w Ustawieniach iPhone’a → Ekipa → Lokalizacja (najlepiej „Zawsze”).';
-      showBanner(S.gpsError, 'Ustawienia', () => Loc.openSettings());
+      S.gpsError = t('gps.deniedIos');
+      showBanner(S.gpsError, t('b.settings'), () => Loc.openSettings());
     });
     Loc.addListener('auth', a => { S.auth = a.status; if (a.status === 'whenInUse') askAlways(); });
   }
-  if (!S.myPos) showBanner('Czekam na sygnał GPS… zezwól na lokalizację.');
+  if (!S.myPos) showBanner(t('gps.wait'));
   try { const r = await Loc.start({ mode: S.gpsMode }); S.auth = r.auth; if (r.auth === 'whenInUse') askAlways(); }
-  catch (e) { S.gpsError = 'Nie udało się uruchomić GPS (' + (e?.message || e) + ').'; showBanner(S.gpsError); }
+  catch (e) { S.gpsError = t('gps.fail', { e: e?.message || e }); showBanner(S.gpsError); }
 }
 // "Always" lets the phone report from a pocket. iOS shows its own prompt once; after that only Settings can change it.
 let alwaysNagged = false;
@@ -351,7 +362,7 @@ function askAlways() {
   if (alwaysNagged) return;
   alwaysNagged = true;
   setTimeout(() => {
-    showBanner('Ustaw lokalizację „Zawsze”, żeby znajomi widzieli Cię z telefonem w kieszeni.', 'Ustawienia', () => { hideBanner(); Loc.openSettings(); });
+    showBanner(t('gps.always'), t('b.settings'), () => { hideBanner(); Loc.openSettings(); });
     setTimeout(() => hideBannerIf('Zawsze'), 12000);
   }, 4000);
 }
@@ -445,7 +456,7 @@ function drawMe() {
   if (!S.myPos || document.hidden) return;
   const ll = [S.myPos[0], S.myPos[1]];
   if (!meMarker) {
-    meMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [22, 22] }), zIndexOffset: 1000, keyboard: false }).addTo(map).bindTooltip('Ty', { direction: 'top', offset: [0, -10] });
+    meMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [22, 22] }), zIndexOffset: 1000, keyboard: false }).addTo(map).bindTooltip(t('me.tip'), { direction: 'top', offset: [0, -10] });
     meMarker.on('click', () => HOOK.meClick?.());
     meAcc = L.circle(ll, { radius: S.myPos[3] || 10, renderer, color: '#1a73e8', weight: 1, fillOpacity: 0.08, interactive: false }).addTo(map);
   } else { meMarker.setLatLng(ll); meAcc.setLatLng(ll).setRadius(Math.min(S.myPos[3] || 10, 300)); }
@@ -515,7 +526,7 @@ function stopDemo() { if (demoTimer) clearInterval(demoTimer); demoTimer = null;
 /* ---------- render ---------- */
 function visibleFriends() { const now = Date.now(); return [...S.friends.values()].filter(f => now - f.t < MAX_AGE_SHOW); }
 function initials(n) { return (n || '?').trim().slice(0, 2).toUpperCase(); }
-function agoTxt(t) { const s = (Date.now() - t) / 1000; if (s < 45) return 'teraz'; if (s < 3600) return Math.round(s / 60) + ' min temu'; return Math.floor(s / 3600) + ' h temu'; }
+function agoTxt(ts) { const s = (Date.now() - ts) / 1000; if (s < 45) return t('ago.now'); if (s < 3600) return t('ago.min', { n: Math.round(s / 60) }); return t('ago.h', { n: Math.floor(s / 3600) }); }
 function distTo(f) { return S.myPos ? haversine([S.myPos[0], S.myPos[1]], [f.pos[0], f.pos[1]]) : null; }
 
 let lastFull = 0;
@@ -620,10 +631,9 @@ function renderSheet(fr, force) {
 }
 
 function statusTag(s, act) {
-  if (act === 'pre') return '<span class="tag">przed jazdą</span>';
-  if (act === 'off') return '<span class="tag">poza stokiem</span>';
-  if (act === 'done') return '<span class="tag">koniec</span>';
-  if (s === 'wait') return '<span class="tag wait">czeka</span>'; if (s === 'hut') return '<span class="tag">schronisko</span>'; if (s === 'done') return '<span class="tag">koniec</span>'; return ''; }
+  const tag = (k, c = '') => `<span class="tag ${c}">${t('tag.' + k)}</span>`;
+  if (act === 'pre' || act === 'off' || act === 'done') return tag(act);
+  if (s === 'wait') return tag('wait', 'wait'); if (s === 'hut') return tag('hut'); if (s === 'done') return tag('done'); return ''; }
 
 function listHtml(fr) {
   const status = '';
@@ -634,55 +644,55 @@ function listHtml(fr) {
     const brg = S.myPos ? bearing([S.myPos[0], S.myPos[1]], [f.pos[0], f.pos[1]]) : 0;
     return `<button class="row${S.selected === f.id ? ' sel' : ''}" data-id="${esc(f.id)}">
       <div class="av" style="background:${f.color};color:${f.color}"><span style="color:#fff">${esc(initials(f.name))}</span></div>
-      <div style="min-width:0"><div class="nm"><b>${esc(f.name)}</b>${statusTag(f.status, f.act)}${f.demo ? '<span class="tag">demo</span>' : ''}${stale ? '<span class="tag stale">stare</span>' : ''}</div>
+      <div style="min-width:0"><div class="nm"><b>${esc(f.name)}</b>${statusTag(f.status, f.act)}${f.demo ? `<span class="tag">${t('tag.demo')}</span>` : ''}${stale ? `<span class="tag stale">${t('tag.stale')}</span>` : ''}</div>
       <div class="st">${esc(p.text || '')}</div></div>
       <div class="rt">${d != null ? `<div class="d">${arrowSvg(brg)} ${fmtDist(d)}</div>` : ''}<div class="ago">${agoTxt(f.t)}</div></div></button>`;
   }).join('');
-  if (!fr.length) rows = `<div class="empty">Nikogo jeszcze nie widać. Wyślij znajomym link do aplikacji i kod grupy <b>${esc(S.me?.group || '')}</b>. Pojawią się tu, gdy włączą aplikację na stoku.<br><br><button class="btn" data-act="demo">Pokaż demo z symulowanymi znajomymi</button></div>`;
-  const tabs = `<div class="tabs" role="tablist"><button data-act="tab" data-tab="crew" class="${S.tab !== 'rank' ? 'on' : ''}">Ekipa <span class="count">${fr.length}</span></button><button data-act="tab" data-tab="rank" class="${S.tab === 'rank' ? 'on' : ''}">Ranking dnia</button></div>`;
+  if (!fr.length) rows = `<div class="empty">${t('list.empty', { code: esc(S.me?.group || '') })}<br><br><button class="btn" data-act="demo">${t('list.demo')}</button></div>`;
+  const tabs = `<div class="tabs" role="tablist"><button data-act="tab" data-tab="crew" class="${S.tab !== 'rank' ? 'on' : ''}">${t('tab.crew')} <span class="count">${fr.length}</span></button><button data-act="tab" data-tab="rank" class="${S.tab === 'rank' ? 'on' : ''}">${t('tab.rank')}</button></div>`;
   if (S.tab === 'rank' && HOOK.rank) return tabs + `<div class="list">${HOOK.rank()}</div>`;
   const top = HOOK.top.map(h => { try { return h(); } catch (err) { console.error(err); return ''; } }).join('');
-  return tabs + `<h2 class="me-line"><span>${S.myPos ? `Ty: ${ACT_PL[S.act]}${S.me?.share === false ? ' · nie udostępniasz pozycji' : (S.me?.hideUntil || 0) > Date.now() ? ' · ukryty do ' + new Date(S.me.hideUntil).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : ''}` : 'Brak Twojej pozycji'}</span></h2>${status}<div class="list">${top}${rows}${HOOK.listEnd?.() || ''}</div>`;
+  return tabs + `<h2 class="me-line"><span>${S.myPos ? t('me.line', { act: ACT_PL[S.act] }) + (S.me?.share === false ? ' · ' + t('me.noshare') : (S.me?.hideUntil || 0) > Date.now() ? ' · ' + t('me.hidden', { t: hhmm(S.me.hideUntil) }) : '') : t('me.nopos')}</span></h2>${status}<div class="list">${top}${rows}${HOOK.listEnd?.() || ''}</div>`;
 }
 
 function detailHtml(f) {
   const p = S.preds.get(f.id) || {}, d = distTo(f), plan = S.plan;
   const opts = (p.options || []).map(o => { const b = wayBadge(o.w); return `<span style="display:inline-flex;gap:6px;align-items:center"><span class="pb ${b.cls}">${esc(b.txt)}</span><span style="font-size:13px">${esc(wayLabel(o.w))}</span></span>`; }).join('');
   let planHtml = '';
-  if (!S.myPos) planHtml = `<p class="small">Włącz GPS, żeby wyznaczyć drogę do ${esc(f.name)}.</p>`;
-  else if (!S.net) planHtml = `<p class="small">Wczytuję mapę tras…</p>`;
-  else if (!plan) planHtml = `<p class="small">Liczę drogę…</p>`;
+  if (!S.myPos) planHtml = `<p class="small">${t('d.gpsOff', { name: esc(f.name) })}</p>`;
+  else if (!S.net) planHtml = `<p class="small">${t('d.loadingNet')}</p>`;
+  else if (!plan) planHtml = `<p class="small">${t('d.calc')}</p>`;
   else if (plan.error) planHtml = `<p class="small">${esc(plan.error)}</p>`;
   else {
     const where = nodeLabel(plan.node);
     const head = plan.inTime
-      ? (plan.friendT < 30 && plan.myT < 60 ? `Jesteście obok siebie` : `Spotkanie ${where ? 'przy: ' + esc(where) : 'na trasie'} za ok. ${fmtMin(plan.meetT)}`)
-      : `Dojedziesz ${where ? 'do: ' + esc(where) : ''} ok. ${fmtMin(plan.lateBy)} po ${esc(f.name)} – napisz, żeby poczekał(a)`;
-    const sub = plan.inTime ? `Ty: ${fmtMin(plan.myT)} · ${esc(f.name)}: ${plan.friendT < 30 ? 'już tam jest' : fmtMin(plan.friendT)}` : `Ty: ${fmtMin(plan.myT)}`;
-    const steps = plan.steps.map(s => { const b = wayBadge(s.w); return `<li><span class="pb ${b.cls}">${esc(b.txt)}</span><span>${s.w ? esc(s.w.kind === 'lift' ? 'Wjedź: ' + wayLabel(s.w) : 'Zjedź: ' + wayLabel(s.w)) : 'Przejdź / przejedź'}</span><span class="meta">${fmtDist(s.d)} · ${fmtMin(s.t)}</span></li>`; }).join('');
+      ? (plan.friendT < 30 && plan.myT < 60 ? t('d.together') : where ? t('d.meetAt', { where: esc(where), t: fmtMin(plan.meetT) }) : t('d.meetRun', { t: fmtMin(plan.meetT) }))
+      : where ? t('d.late', { where: esc(where), t: fmtMin(plan.lateBy), name: esc(f.name) }) : t('d.lateNo', { t: fmtMin(plan.lateBy), name: esc(f.name) });
+    const sub = plan.inTime ? t('d.sub', { me: fmtMin(plan.myT), name: esc(f.name), them: plan.friendT < 30 ? t('d.there') : fmtMin(plan.friendT) }) : t('d.subMe', { me: fmtMin(plan.myT) });
+    const steps = stepsHtml(plan.steps);
     planHtml = `<div class="big">${head}</div><div class="small" style="margin-top:2px">${sub}</div>${steps ? `<ol class="steps">${steps}</ol>` : ''}`;
   }
   return `<div class="detail">
     <div class="dhead"><div class="av" style="background:${f.color};color:${f.color}"><span style="color:#fff">${esc(initials(f.name))}</span></div>
       <div class="t"><b>${esc(f.name)}</b>${f.full && f.full !== f.name ? `<span style="display:block">${esc(f.full)}</span>` : ''}<span>${d != null ? fmtDist(d) + ' od Ciebie · ' : ''}${agoTxt(f.t)}${p.m?.spd > 1 ? ' · ' + kmh(p.m.spd) : ''}</span></div>
-      <button class="close" data-act="back" aria-label="Wróć do listy">×</button></div>
-    <div class="box"><h3>Gdzie jest i dokąd jedzie</h3><div class="big" style="font-size:18px">${esc(p.text || '–')}</div>
-      ${opts ? `<div class="small" style="margin-top:8px">Potem może pojechać:</div><div class="opts">${opts}</div>` : ''}</div>
-    <div class="box"><h3>Droga do: ${esc(f.name)}</h3>${planHtml}</div>
-    <div class="actions"><button class="btn primary" data-act="navfriend" data-id="${esc(f.id)}">Prowadź do: ${esc(f.name)}</button><button class="btn dark" data-act="center">Pokaż na mapie</button><button class="btn" data-act="back">Wszyscy</button></div>
+      <button class="close" data-act="back" aria-label="${t('a.backList')}">×</button></div>
+    <div class="box"><h3>${t('d.where')}</h3><div class="big" style="font-size:18px">${esc(p.text || '–')}</div>
+      ${opts ? `<div class="small" style="margin-top:8px">${t('d.then')}</div><div class="opts">${opts}</div>` : ''}</div>
+    <div class="box"><h3>${t('d.route', { name: esc(f.name) })}</h3>${planHtml}</div>
+    <div class="actions"><button class="btn primary" data-act="navfriend" data-id="${esc(f.id)}">${t('d.guide', { name: esc(f.name) })}</button><button class="btn dark" data-act="center">${t('d.showMap')}</button><button class="btn" data-act="back">${t('d.all')}</button></div>
   </div>`;
 }
 function nodeLabel(n) {
   if (!S.net) return '';
   const ws = n.ways.map(i => S.net.ways[i]).filter(w => w.kind !== 'area');
   const liftStart = ws.find(w => w.kind === 'lift' && w.pts[0] === n), liftEnd = ws.find(w => w.kind === 'lift' && w.pts[w.pts.length - 1] === n);
-  if (liftStart) return 'dolna stacja ' + wayLabel(liftStart);
-  if (liftEnd) return 'górna stacja ' + wayLabel(liftEnd);
+  if (liftStart) return t('node.bottom', { name: wayLabel(liftStart) });
+  if (liftEnd) return t('node.top', { name: wayLabel(liftEnd) });
   const near = n.out.filter(e => e.w === -1).map(e => e.to.ways.map(i => S.net.ways[i])).flat();
   const nl = near.find(w => w.kind === 'lift' && w.pts[0] && n.out.some(e => e.to === w.pts[0]));
-  if (nl) return 'dolna stacja ' + wayLabel(nl);
+  if (nl) return t('node.bottom', { name: wayLabel(nl) });
   const bottom = ws.find(w => w.kind === 'piste' && w.pts[w.pts.length - 1] === n);
-  if (bottom) return 'dół trasy ' + wayLabel(bottom);
+  if (bottom) return t('node.runEnd', { name: wayLabel(bottom) });
   const p = ws.find(w => w.kind === 'piste') || ws[0];
   return p ? wayLabel(p) : '';
 }
@@ -702,7 +712,7 @@ $('#sheetBody').addEventListener('click', e => {
 function setStatus(k) {
   S.me.status = k; saveMe(); publish(true);
   $('#stMenu').hidden = true; renderStatusBtn(); tick(true);
-  toast('Status: ' + (STATUSES.find(x => x[0] === k) || STATUSES[0])[1]);
+  toast(t('t.status', { s: (STATUSES.find(x => x[0] === k) || STATUSES[0])[1] }));
 }
 function renderStatusBtn() {
   const my = S.me?.status || 'ride';
@@ -755,7 +765,7 @@ function hideBanner() { $('#banner').hidden = true; }
 function hideBannerIf(word) { if ($('#banner').textContent.includes(word)) hideBanner(); }
 $('#banner').onclick = e => { if (e.target.tagName === 'BUTTON' && bannerAct) bannerAct(); };
 let toastT;
-function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2600); }
+function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2600); }
 
 /* ---------- setup + settings ---------- */
 function colorPicker(el, cur, onPick) {
@@ -779,9 +789,10 @@ function openSetup() {
     e.preventDefault();
     const nick = $('#inNick').value.trim(), first = $('#inFirst').value.trim(), last = $('#inLast').value.trim();
     const group = $('#inGroup').value.trim().toLowerCase();
-    if (!nick && !first) { toast('Wpisz ksywkę albo imię'); $('#inNick').focus(); return; }
-    if (group.length < 4) { toast('Kod grupy musi mieć co najmniej 4 znaki'); return; }
-    S.me = { id: crypto.randomUUID ? crypto.randomUUID() : hex(crypto.getRandomValues(new Uint8Array(16))), nick, first, last, color, group, status: 'ride', share: true, wake: true, demo: false, founder: group === generated };
+    if (!nick && !first) { toast(t('t.nick')); $('#inNick').focus(); return; }
+    if (group.length < 4) { toast(t('t.code4')); return; }
+    if (!$('#inTerms').checked) { toast(t('t.terms')); return; }
+    S.me = { id: crypto.randomUUID ? crypto.randomUUID() : hex(crypto.getRandomValues(new Uint8Array(16))), nick, first, last, color, group, status: 'ride', share: true, wake: true, demo: false, founder: group === generated, terms: Date.now() };
     saveMe();
     $('#setup').hidden = true;
     await start();
@@ -799,7 +810,7 @@ function openSettings() {
   $('#settings').hidden = false;
   $('#btnSave').onclick = () => {
     const nick = $('#stNick').value.trim(), first = $('#stFirst').value.trim();
-    if (!nick && !first) { toast('Wpisz ksywkę albo imię'); return; }
+    if (!nick && !first) { toast(t('t.nick')); return; }
     S.me.nick = nick; S.me.first = first; S.me.last = $('#stLast').value.trim(); delete S.me.name;
     S.me.eco = $('#stEco').checked; setGpsMode(true);
     S.me.color = color; S.me.wake = $('#stWake').checked;
@@ -808,31 +819,25 @@ function openSettings() {
     saveMe(); applyWake(); publish(true);
     $('#settings').hidden = true;
     if (modeChanged) applyMode();
-    tick(true); toast('Zapisano');
+    tick(true); toast(t('t.saved'));
   };
 }
 function renderBattery() {
   const el = $('#stBatt');
-  const mode = `Tryb GPS teraz: <b>${MODE_PL[S.gpsMode]}</b> · Ty: ${ACT_PL[S.act]}.`;
-  if (!NATIVE) { el.innerHTML = mode + '<br>Pomiar zużycia baterii działa w aplikacji na iPhone.'; return; }
+  const mode = t('bat.mode', { mode: MODE_PL[S.gpsMode], act: ACT_PL[S.act] });
+  if (!NATIVE) { el.innerHTML = mode + '<br>' + t('bat.web'); return; }
   const b = S.batt, r = batteryRate();
-  const lvl = b && b.level >= 0 ? `Bateria: ${Math.round(b.level * 100)}%${b.state === 'charging' ? ' (ładuje się)' : ''}${b.lowPower ? ' · tryb niskiego zużycia' : ''}.` : '';
-  const rate = r ? `Zużycie z aplikacją: <b>ok. ${r.perHour.toFixed(1).replace('.', ',')}%/h</b> (pomiar z ${fmtMin(r.hours * 3600)}).` : 'Zużycie policzę po ok. 30 min bez ładowania.';
-  const auth = b?.auth === 'whenInUse' ? '<br>Lokalizacja: „Gdy używam”. Ustaw „Zawsze”, żeby działało w kieszeni.' : b?.auth === 'always' ? '<br>Lokalizacja: „Zawsze”.' : '';
+  const lvl = b && b.level >= 0 ? t('bat.lvl', { n: Math.round(b.level * 100) }) + (b.state === 'charging' ? ' ' + t('bat.charging') : '') + (b.lowPower ? ' · ' + t('bat.low') : '') + '.' : '';
+  const rate = r ? t('bat.rate', { r: fmt1(r.perHour), t: fmtMin(r.hours * 3600) }) : t('bat.wait');
+  const auth = b?.auth === 'whenInUse' ? '<br>' + t('bat.whenInUse') : b?.auth === 'always' ? '<br>' + t('bat.always') : '';
   el.innerHTML = `${mode}<br>${lvl} ${rate}${auth}`;
 }
 $('#btnSettings').onclick = openSettings;
 $('#settings').addEventListener('click', e => { if (e.target.id === 'settings' || e.target.closest('[data-close]')) $('#settings').hidden = true; });
 const WEB_URL = 'https://h3rm44n.github.io/ekipa-na-stoku/';
-$('#btnCopy').onclick = async () => {
-  const txt = `Ekipa na Stoku – kod grupy: ${S.me.group}\n${WEB_URL}#g-${S.me.group}`;
-  if (navigator.share) { try { await navigator.share({ text: txt }); return; } catch (e) { if (e?.name === 'AbortError') return; } }
-  try { await navigator.clipboard.writeText(txt); toast('Skopiowano link z kodem'); }
-  catch { const r = document.createRange(); r.selectNodeContents($('#stGroup')); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Zaznaczono kod – skopiuj go'); }
-};
 $('#btnLeave').onclick = () => {
   const b = $('#btnLeave');
-  if (!b.dataset.confirm) { b.dataset.confirm = '1'; b.textContent = 'Na pewno? Kliknij jeszcze raz'; setTimeout(() => { delete b.dataset.confirm; b.textContent = 'Opuść grupę'; }, 4000); return; }
+  if (!b.dataset.confirm) { b.dataset.confirm = '1'; b.textContent = t('leave.confirm'); setTimeout(() => { delete b.dataset.confirm; b.textContent = t('leave'); }, 4000); return; }
   clearMine(); for (const h of HOOK.leave) try { h(); } catch {} setTimeout(() => { disconnect(); stopGps(); stopDemo(); LS.del('ek.me'); location.hash = ''; location.reload(); }, 600);
 };
 $('#btnNetResort').onclick = () => { $('#settings').hidden = true; loadNet(RESORT.bbox, RESORT.center, 'Madonna di Campiglio', true); };
@@ -840,7 +845,7 @@ $('#btnNetHere').onclick = () => {
   $('#settings').hidden = true;
   const c = map.getCenter(), dLat = 0.09, dLon = 0.12;
   const bbox = [c.lat - dLat, c.lng - dLon, c.lat + dLat, c.lng + dLon].map(v => +v.toFixed(3));
-  loadNet(bbox, [c.lat, c.lng], 'Okolica widoku', true);
+  loadNet(bbox, [c.lat, c.lng], t('net.view'), true);
 };
 
 function applyMode() {
@@ -861,12 +866,17 @@ async function start() {
   loadNet(meta.bbox, meta.center, meta.label);
 }
 
+// In the iPhone app the help/privacy pages open in Safari instead of replacing the app screen.
+if (NATIVE) document.addEventListener('click', e => { const a = e.target.closest('a[href$=".html"]'); if (a) { e.preventDefault(); location.href = WEB_URL + a.getAttribute('href'); } });
+
 /* ---------- boot ---------- */
+applyI18n();
+langSelect($('#stLang')); langSelect($('#inLang'));
 if (!NATIVE && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
-if (NATIVE) { document.documentElement.classList.add('native'); $('#stWake').closest('label').hidden = true; $('#btnCopy').textContent = 'Udostępnij'; }
-if (!NATIVE && !window.isSecureContext) showBanner('Otwórz aplikację przez https://, inaczej telefon nie udostępni GPS.');
+if (NATIVE) { document.documentElement.classList.add('native'); $('#stWake').closest('label').hidden = true; }
+if (!NATIVE && !window.isSecureContext) showBanner(t('b.https'));
 if (S.me && S.me.group) {
   const fromLink = (location.hash.match(/^#g-([a-z0-9-]{3,40})$/) || [])[1];
-  if (fromLink && fromLink !== S.me.group) { S.me.group = fromLink; saveMe(); toast('Dołączono do grupy ' + fromLink); }
+  if (fromLink && fromLink !== S.me.group) { S.me.group = fromLink; saveMe(); toast(t('t.joined', { code: fromLink })); }
   start();
 } else openSetup();

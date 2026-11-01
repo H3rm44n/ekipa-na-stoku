@@ -1,0 +1,14 @@
+/* Privacy, terms and help pages */
+:root { --ink: #0f2a44; --ink-2: #3b5670; --bg: #f4f8fb; --card: #fff; --line: #d7e2ec; --accent: #d45500; }
+@media (prefers-color-scheme: dark) { :root { --ink: #e8f0f7; --ink-2: #a9bccd; --bg: #0c1824; --card: #13253a; --line: #24405c; --accent: #ff8a3d; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 "Barlow", system-ui, -apple-system, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+article { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 8px 22px 22px; margin-bottom: 24px; }
+h1 { font: 700 32px/1.1 "Barlow Condensed", "Arial Narrow", sans-serif; text-transform: uppercase; letter-spacing: .02em; margin: 20px 0 4px; }
+h2 { font: 700 19px/1.2 "Barlow Condensed", "Arial Narrow", sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); margin: 26px 0 6px; }
+.meta { color: var(--ink-2); font-size: 14px; margin: 0 0 8px; }
+.langs { font-weight: 600; }
+a { color: var(--accent); }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }

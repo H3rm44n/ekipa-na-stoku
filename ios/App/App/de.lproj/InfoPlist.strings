@@ -1,0 +1,3 @@
+/* Location permission texts */
+"NSLocationWhenInUseUsageDescription" = "Ekipa zeigt den Freunden in deiner Gruppe, wo du auf der Piste bist.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Erlaube „Immer“, damit Freunde dich auch mit gesperrtem Handy in der Tasche sehen.";

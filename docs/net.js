@@ -15,9 +15,11 @@ const WALK_SPEED = 1.0;   // m/s, clicking in / shuffling over
 const LINK_R = 60;        // m, how far apart two ways can be and still count as connected
 const TOWN_R = 400;       // m, walk from a piste bottom to another lift's base station (resort villages)
 
-const LIFT_PL = { cable_car: 'kolej linowa', gondola: 'gondola', mixed_lift: 'gondola/krzesło', chair_lift: 'krzesełko', drag_lift: 'orczyk', 't-bar': 'orczyk', 'j-bar': 'orczyk', platter: 'talerzyk', rope_tow: 'wyciąg linowy', magic_carpet: 'taśma' };
-const LIFT_INSTR = { cable_car: 'kolejką', gondola: 'gondolą', mixed_lift: 'gondolą', chair_lift: 'krzesełkiem', drag_lift: 'orczykiem', 't-bar': 'orczykiem', 'j-bar': 'orczykiem', platter: 'talerzykiem', rope_tow: 'wyciągiem linowym', magic_carpet: 'taśmą' };
-const DIFF_PL = { novice: 'zielona', easy: 'niebieska', intermediate: 'czerwona', advanced: 'czarna', expert: 'czarna', freeride: 'freeride' };
+// Names in the current language (i18n.js): lift type, "riding the …" phrase, piste colour.
+const tmap = (keys, pre) => Object.fromEntries(keys.map(k => [k, t(pre + k)]));
+const LIFT_PL = tmap(Object.keys(LIFT_SPEED), 'lift.');
+const LIFT_INSTR = tmap(Object.keys(LIFT_SPEED), 'ride.');
+const DIFF_PL = tmap(Object.keys(PISTE_SPEED), 'diff.');
 
 async function fetchSkiData(bbox) {
   const [s, w, n, e] = bbox;
@@ -287,26 +289,26 @@ function bearing(a, b) {
 
 function wayLabel(w) {
   if (!w) return '';
-  if (w.kind === 'lift') return (w.name || w.ref || 'wyciąg') + (w.name && w.ref && w.ref !== w.name ? ` (${w.ref})` : '');
-  if (w.kind === 'conn') return w.name || 'łącznik';
-  const n = w.name && w.ref && w.name !== w.ref ? `${w.ref} ${w.name}` : (w.name || (w.ref ? `trasa ${w.ref}` : 'trasa bez nazwy'));
+  if (w.kind === 'lift') return (w.name || w.ref || t('way.lift')) + (w.name && w.ref && w.ref !== w.name ? ` (${w.ref})` : '');
+  if (w.kind === 'conn') return w.name || t('way.conn');
+  const n = w.name && w.ref && w.name !== w.ref ? `${w.ref} ${w.name}` : (w.name || (w.ref ? t('way.piste', { ref: w.ref }) : t('way.noname')));
   return n;
 }
 // "krzesełko 6-os., osłona, podgrzewane"
 function liftKind(w) {
   if (!w || w.kind !== 'lift') return '';
-  let t = LIFT_PL[w.sub] || 'wyciąg';
-  if (w.occ > 1 && /chair|mixed|gondola|cable/.test(w.sub)) t += ` ${w.occ}-os.`;
-  if (w.flags?.includes('b')) t += ', osłona';
-  if (w.flags?.includes('h')) t += ', podgrzewane';
-  return t;
+  let s = LIFT_PL[w.sub] || t('way.lift');
+  if (w.occ > 1 && /chair|mixed|gondola|cable/.test(w.sub)) s += ' ' + t('lk.occ', { n: w.occ });
+  if (w.flags?.includes('b')) s += ', ' + t('lk.bubble');
+  if (w.flags?.includes('h')) s += ', ' + t('lk.heated');
+  return s;
 }
 function wayBadge(w) {
-  if (!w) return { cls: 'walk', txt: 'PIESZO' };
-  if (w.kind === 'lift') return { cls: 'lift', txt: (LIFT_PL[w.sub] || 'wyciąg').toUpperCase() };
-  if (w.kind === 'conn') return { cls: 'conn', txt: 'ŁĄCZNIK' };
+  if (!w) return { cls: 'walk', txt: t('b.walk') };
+  if (w.kind === 'lift') return { cls: 'lift', txt: (LIFT_PL[w.sub] || t('way.lift')).toLocaleUpperCase(LANG) };
+  if (w.kind === 'conn') return { cls: 'conn', txt: t('b.conn') };
   const cls = { novice: 'easy', easy: 'easy', intermediate: 'inter', advanced: 'adv', expert: 'adv', freeride: 'free' }[w.diff] || 'inter';
-  return { cls, txt: w.ref ? 'TRASA ' + w.ref : 'TRASA' };
+  return { cls, txt: w.ref ? t('b.run_ref', { ref: w.ref }) : t('b.run') };
 }
 
 // Heading + speed from a track of [lat, lon, tMs], looking ~15-60 s back.
@@ -334,10 +336,10 @@ function predict(net, f, now = Date.now()) {
   const m = motion(f.track, f.pos[4]);
   const res = { age, m, state: 'unknown', text: '', where: '', path: [], options: [], cand: [], eta: null, endLL: null };
   const moving = m.spd > 0.9;
-  const ACT_TXT = { pre: 'jeszcze nie wyszedł(a) na stok', done: 'skończył(a) jazdę', off: 'poza stokiem' };
+  const ACT_TXT = { pre: t('act.pre'), done: t('act.done'), off: t('act.off') };
   if (!net) {
     res.state = moving ? 'move' : 'stop';
-    res.text = moving ? `jedzie ${kmh(m.spd)}` : 'stoi';
+    res.text = moving ? t('p.moving', { v: kmh(m.spd) }) : t('p.standing');
     return res;
   }
   const sn = net.snap(pos[0], pos[1], m.hdg, m.spd);
@@ -346,7 +348,7 @@ function predict(net, f, now = Date.now()) {
   const nearestNode = () => { const [x, y] = net.P(pos[0], pos[1]); const nn = net.nearNodes(x, y, 250).filter(a => net.stop(a[0])).sort((a, b) => a[1] - b[1])[0]; return nn; };
 
   if (age > 900) {
-    res.state = 'lost'; res.text = 'brak sygnału' + (res.where ? ` · ostatnio: ${res.where}` : '');
+    res.state = 'lost'; res.text = t('p.lost') + (res.where ? ' · ' + t('p.lastAt', { w: res.where }) : '');
     const nn = nearestNode(); if (nn) res.cand.push({ node: nn[0], t: 0, hold: true });
     return res;
   }
@@ -355,7 +357,7 @@ function predict(net, f, now = Date.now()) {
   if (offNet || ((f.act === 'pre' || f.act === 'done') && !moving)) {
     res.state = f.act === 'pre' || f.act === 'done' ? f.act : 'off';
     const poi = net.nearPoi(pos[0], pos[1], 70);
-    res.text = ACT_TXT[res.state] + (poi ? ` · ${POI_AT[poi.kind]} ${poi.name}` : !offNet && res.where ? ` · ${res.where}` : '') + (offNet && moving && m.spd > 8 ? ` · w drodze ${kmh(m.spd)}` : '');
+    res.text = ACT_TXT[res.state] + (poi ? ` · ${POI_AT[poi.kind]} ${poi.name}` : !offNet && res.where ? ` · ${res.where}` : '') + (offNet && moving && m.spd > 8 ? ' · ' + t('p.onWay', { v: kmh(m.spd) }) : '');
     const [x, y] = net.P(pos[0], pos[1]);
     const nn = net.nearNodes(x, y, 900).filter(a => net.stop(a[0])).sort((a, b) => a[1] - b[1])[0];
     if (nn) res.cand.push({ node: nn[0], t: 0, hold: true });
@@ -381,9 +383,8 @@ function predict(net, f, now = Date.now()) {
     const end = w.pts[w.pts.length - 1];
     res.eta = eta; res.endLL = [end.lat, end.lon];
     res.state = onLift ? 'lift' : 'piste';
-    res.text = onLift
-      ? `jedzie ${LIFT_INSTR[w.sub] || 'wyciągiem'} ${wayLabel(w)} · na górze ${eta < 60 ? 'za chwilę' : 'za ' + fmtMin(eta)}`
-      : `zjeżdża: ${wayLabel(w)} · koniec trasy ${eta < 60 ? 'za chwilę' : 'za ' + fmtMin(eta)}`;
+    const etaTxt = eta < 60 ? t('eta.soon') : t('eta.in', { t: fmtMin(eta) });
+    res.text = onLift ? t('p.lift', { ride: LIFT_INSTR[w.sub] || t('ride.lift'), name: wayLabel(w), eta: etaTxt }) : t('p.piste', { name: wayLabel(w), eta: etaTxt });
     // Lift top / piste bottom is where people pause: let a meeting wait there a bit.
     if (res.cand.length) res.cand[res.cand.length - 1].slack = onLift ? 60 : 90;
     addOptions(net, res, end, w.wi, eta);
@@ -395,7 +396,7 @@ function predict(net, f, now = Date.now()) {
     const dist = m.spd * 45, r = Math.PI / 180;
     const dLat = Math.cos(m.hdg * r) * dist / 110574, dLon = Math.sin(m.hdg * r) * dist / (111320 * Math.cos(pos[0] * r));
     res.path = [pos, [pos[0] + dLat, pos[1] + dLon]];
-    res.text = `jedzie ${kmh(m.spd)}` + (res.where ? ` · ${res.where}` : '');
+    res.text = t('p.moving', { v: kmh(m.spd) }) + (res.where ? ` · ${res.where}` : '');
     const nn = nearestNode(); if (nn) res.cand.push({ node: nn[0], t: 0, slack: 60 });
     return res;
   }
@@ -410,15 +411,15 @@ function predict(net, f, now = Date.now()) {
   }
   const poi = net.nearPoi(pos[0], pos[1], 70);
   if (poi) res.poi = poi;
-  const label = poi && f.status !== 'wait' ? `${POI_AT[poi.kind]} ${poi.name}` : { hut: 'w schronisku', wait: 'czeka na was', done: 'kończy jazdę' }[f.status];
+  const label = poi && f.status !== 'wait' ? `${POI_AT[poi.kind]} ${poi.name}` : { hut: t('fst.hut'), wait: t('fst.wait'), done: t('fst.done') }[f.status];
   const nn = nearestNode();
   if (nn) res.cand.push({ node: nn[0], t: 0, hold: f.status === 'wait' || f.status === 'hut', slack: 180 });
   if (liftBase && !label) {
-    res.text = `stoi przy wyciągu ${wayLabel(liftBase.w)} (${LIFT_PL[liftBase.w.sub] || 'wyciąg'}) · pewnie zaraz wjedzie`;
+    res.text = t('p.liftq', { name: wayLabel(liftBase.w), kind: LIFT_PL[liftBase.w.sub] || t('way.lift') });
     res.options.push({ w: liftBase.w, path: liftLL(liftBase.w, 0), t0: 0 });
     pushWayCand(net, res, liftBase.w, 0, LIFT_QUEUE * 0.5);
   } else {
-    res.text = (label || 'stoi') + (res.where ? ` · ${res.where}` : '');
+    res.text = (label || t('p.standing')) + (res.where ? ` · ${res.where}` : '');
     if (!label && res.snap?.w && res.snap.d < 45) addOptions(net, res, res.snap.w.pts[Math.min(res.snap.i + 1, res.snap.w.pts.length - 1)], -99, 0, res.snap.w);
   }
   return res;
@@ -505,7 +506,7 @@ function buildRoute(net, me, prev, target) {
 function planMeet(net, me, pred) {
   if (!net || !me || !pred || !pred.cand.length) return null;
   const sources = startSources(net, me);
-  if (!sources.length) return { error: 'Jesteś poza siecią tras – podejdź bliżej stoku lub wyciągu.' };
+  if (!sources.length) return { error: t('err.offnet') };
   const { dist, prev } = net.dijkstra(sources);
   // Places on the friend's current piste/lift are certain; places past a fork only possible,
   // so they must be clearly better (90 s) to win. With one way out, the fork is not a guess.
@@ -520,7 +521,7 @@ function planMeet(net, me, pred) {
     else { const l = myT - c.t; if (!late || l < late.lateBy) late = { c, myT, meetT: myT, lateBy: l }; }
   }
   const pick = best || late;
-  if (!pick) return { error: 'Nie znalazłem drogi po trasach do tego miejsca.' };
+  if (!pick) return { error: t('err.noroute') };
   const { line, steps } = buildRoute(net, me, prev, pick.c.node);
   return { node: pick.c.node, myT: pick.myT, friendT: pick.c.t, meetT: pick.meetT, inTime: !!best, lateBy: best ? 0 : pick.lateBy, steps, line, via: pick.c.opt && ways.size > 1 ? pick.c.via : null };
 }
@@ -536,20 +537,20 @@ function routeToPoint(net, me, lat, lon) {
   if (!sources.length || !ends.length) {
     // Off the network on both or either side: just walk.
     if (direct < 1500) return { myT: direct / WALK_SPEED, steps: [{ w: null, d: direct, t: direct / WALK_SPEED }], line: [[me.pos[0], me.pos[1]], [lat, lon]], dist: direct, walkOnly: true };
-    return { error: !sources.length ? 'Jesteś poza siecią tras – podejdź bliżej stoku lub wyciągu.' : 'To miejsce jest daleko od tras i wyciągów.' };
+    return { error: !sources.length ? t('err.offnet') : t('err.far') };
   }
   const { dist, prev } = net.dijkstra(sources, 3 * 3600);
   let best = null;
   for (const [n, d] of ends) { const t = dist.get(n.id); if (t == null) continue; const tt = t + d / WALK_SPEED; if (!best || tt < best.t) best = { n, d, t: tt }; }
-  if (!best) return { error: 'Nie znalazłem drogi po trasach do tego miejsca.' };
+  if (!best) return { error: t('err.noroute') };
   const r = buildRoute(net, me, prev, best.n);
   if (best.d > 25) { r.steps.push({ w: null, d: best.d, t: best.d / WALK_SPEED }); r.line.push([lat, lon]); }
   return { myT: best.t, steps: r.steps, line: r.line, node: best.n, dist: direct };
 }
 
 /* Huts, bars and restaurants near the pistes. */
-const POI_PL = { hut: 'schronisko', bar: 'bar', cafe: 'kawiarnia', food: 'restauracja' };
-const POI_AT = { hut: 'w schronisku', bar: 'w barze', cafe: 'w kawiarni', food: 'w restauracji' };
+const POI_PL = tmap(['hut', 'bar', 'cafe', 'food'], 'poi.');
+const POI_AT = tmap(['hut', 'bar', 'cafe', 'food'], 'at.');
 async function fetchPois(bbox) {
   const [s, w, n, e] = bbox;
   const q = `[out:json][timeout:60];(nwr["amenity"~"^(restaurant|bar|cafe|pub|fast_food|biergarten)$"](${s},${w},${n},${e});nwr["tourism"~"^(alpine_hut|wilderness_hut)$"](${s},${w},${n},${e}););out center tags qt;`;
@@ -589,5 +590,5 @@ SkiNet.prototype.nearPoi = function (lat, lon, r = 60) {
 };
 
 function kmh(ms) { return Math.round(ms * 3.6) + ' km/h'; }
-function fmtMin(s) { if (s < 60) return '<1 min'; const m = Math.round(s / 60); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; }
-function fmtDist(d) { return d < 1000 ? `${Math.round(d / 10) * 10} m` : `${(d / 1000).toFixed(1).replace('.', ',')} km`; }
+function fmtMin(s) { if (s < 60) return t('u.lt1'); const m = Math.round(s / 60); return m >= 60 ? t('u.hmin', { h: Math.floor(m / 60), m: m % 60 }) : t('u.min', { m }); }
+function fmtDist(d) { return d < 1000 ? `${Math.round(d / 10) * 10} m` : `${fmt1(d / 1000)} km`; }

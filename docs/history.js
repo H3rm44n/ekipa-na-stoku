@@ -24,7 +24,7 @@ const DayDB = {
   del(date) { return this.tx('readwrite', st => st.delete(date)).catch(() => {}); },
 };
 const dayKeyDate = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
-const dayTitle = k => { const s = dayKeyDate(k).toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' }); return s[0].toUpperCase() + s.slice(1); };
+const dayTitle = k => { const s = dayKeyDate(k).toLocaleDateString(LANG, { weekday: 'long', day: 'numeric', month: 'long' }); return s[0].toUpperCase() + s.slice(1); };
 
 let todaySavedAt = 0;
 function saveToday(force) {
@@ -186,7 +186,7 @@ function profileSvg(a) {
     else d += `L${X(t).toFixed(1)},${Y(h).toFixed(1)}`;
   }
   if (d) paths += `<path d="${d}" stroke="${col[cur]}" />`;
-  return `<svg class="prof" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Wysokość w ciągu dnia: od ${lo} do ${hi} m">
+  return `<svg class="prof" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${t('h.prof', { lo, hi })}">
     <g fill="none" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke">${paths}</g>
     <text x="2" y="10" font-size="10" fill="currentColor" opacity=".6">${hi} m</text><text x="2" y="${H - 1}" font-size="10" fill="currentColor" opacity=".6">${lo} m</text>
     <text x="${W - 2}" y="${H - 1}" font-size="10" fill="currentColor" opacity=".6" text-anchor="end">${hhmm(t0)}–${hhmm(t1)}</text></svg>`;
@@ -197,33 +197,33 @@ function dayViewHtml() {
   // Live counters for today (they use the GPS speed); for saved days the stored ones, else the track.
   const st = d.st && (d.st.skiM || d.st.liftM) ? d.st : null;
   const skiM = st ? st.skiM : a.skiM, liftM = st ? st.liftM : a.liftM, maxV = Math.max(st?.maxV || 0, a.maxV), vert = st ? st.vertM : a.vertM;
-  const head = `<div class="dhead daynav"><button class="close" data-act="dayprev" aria-label="Poprzedni dzień">‹</button>
-    <div class="t"><b>${today ? 'Dziś' : esc(dayTitle(date))}</b><span>${today ? esc(dayTitle(date)) : ''}${a.start ? `${today ? ' · ' : ''}${hhmm(a.start)}–${hhmm(a.end)}` : ''}</span></div>
-    <button class="close" data-act="daynext" aria-label="Następny dzień"${today ? ' disabled' : ''}>›</button><button class="close" data-act="back" aria-label="Zamknij">×</button></div>`;
-  if (a.segs.length === 0) return `<div class="detail">${head}<div class="empty">${today ? 'Przebieg dnia pojawi się po pierwszym zjeździe. Aplikacja zapisuje każdy zjazd i wyciąg sama.' : 'Brak zapisanego śladu z tego dnia.'}</div>
-    <div class="actions"><button class="btn" data-act="days">Historia dni</button></div></div>`;
+  const head = `<div class="dhead daynav"><button class="close" data-act="dayprev" aria-label="${t('h.prev')}">‹</button>
+    <div class="t"><b>${today ? t('h.today') : esc(dayTitle(date))}</b><span>${today ? esc(dayTitle(date)) : ''}${a.start ? `${today ? ' · ' : ''}${hhmm(a.start)}–${hhmm(a.end)}` : ''}</span></div>
+    <button class="close" data-act="daynext" aria-label="${t('h.next')}"${today ? ' disabled' : ''}>›</button><button class="close" data-act="back" aria-label="${t('a.close')}">×</button></div>`;
+  if (a.segs.length === 0) return `<div class="detail">${head}<div class="empty">${today ? t('h.emptyToday') : t('h.emptyDay')}</div>
+    <div class="actions"><button class="btn" data-act="days">${t('s.days')}</button></div></div>`;
   const nums = `<div class="nums">
-      <div><b>${km(skiM)}</b><span>km zjazdów</span></div><div><b>${km(liftM)}</b><span>km wyciągami</span></div>
-      <div><b>${maxV ? Math.round(maxV * 3.6) : '–'}</b><span>km/h max</span></div><div><b>${a.runs}</b><span>zjazdów</span></div>
-      <div><b>${Math.round(vert).toLocaleString('pl-PL')}</b><span>m w dół</span></div><div><b>${fmtHM(a.skiT)}</b><span>czas zjazdów</span></div>
-      <div><b>${fmtHM(a.liftT)}</b><span>na wyciągach</span></div><div><b>${a.hiAlt != null ? a.hiAlt.toLocaleString('pl-PL') : '–'}</b><span>m n.p.m. max</span></div></div>`;
+      <div><b>${km(skiM)}</b><span>${t('s.skiKm')}</span></div><div><b>${km(liftM)}</b><span>${t('s.liftKm')}</span></div>
+      <div><b>${maxV ? Math.round(maxV * 3.6) : '–'}</b><span>${t('s.maxKmh')}</span></div><div><b>${a.runs}</b><span>${t('s.runs')}</span></div>
+      <div><b>${fmt0(vert)}</b><span>${t('h.vert')}</span></div><div><b>${fmtHM(a.skiT)}</b><span>${t('h.skiT')}</span></div>
+      <div><b>${fmtHM(a.liftT)}</b><span>${t('h.liftT')}</span></div><div><b>${a.hiAlt != null ? fmt0(a.hiAlt) : '–'}</b><span>${t('h.hiAlt')}</span></div></div>`;
   const sel = S.view.sel;
   const items = a.segs.map((s, i) => {
     const on = sel === i ? ' on' : '';
     if (s.m === 's') return `<li class="run${on}" data-act="seg" data-i="${i}"><span class="tm">${hhmm(s.t0)}</span>
-      <span class="nm"><b>Zjazd ${s.no}${s.label ? ': ' + esc(s.label) : ''}</b><span>${fmtDist(s.dist)}${s.drop != null ? ` · ${Math.round(s.drop)} m w dół` : ''} · ${fmtMin(s.dur)}</span></span>
+      <span class="nm"><b>${t('h.run', { n: s.no })}${s.label ? ': ' + esc(s.label) : ''}</b><span>${fmtDist(s.dist)}${s.drop != null ? ' · ' + t('h.drop', { m: Math.round(s.drop) }) : ''} · ${fmtMin(s.dur)}</span></span>
       <span class="mx">${s.maxV ? Math.round(s.maxV * 3.6) + '<small> km/h</small>' : ''}</span></li>`;
     if (s.m === 'l') return `<li class="lift${on}" data-act="seg" data-i="${i}"><span class="tm">${hhmm(s.t0)}</span>
-      <span class="nm"><b>${esc(s.label || 'Wyciąg')}</b><span>${s.w ? esc(LIFT_PL[s.w.sub] || 'wyciąg') + ' · ' : ''}${fmtMin(s.dur)}${s.hi != null ? ` · do ${s.hi} m` : ''}</span></span><span class="mx"></span></li>`;
+      <span class="nm"><b>${esc(s.label || t('h.lift'))}</b><span>${s.w ? esc(LIFT_PL[s.w.sub] || t('way.lift')) + ' · ' : ''}${fmtMin(s.dur)}${s.hi != null ? ' · ' + t('h.upTo', { m: s.hi }) : ''}</span></span><span class="mx"></span></li>`;
     return s.dur >= 300 ? `<li class="rest"><span class="tm">${hhmm(s.t0)}</span><span class="nm"><b>${esc(restName(s))}</b><span>${fmtMin(s.dur)}</span></span><span class="mx"></span></li>` : '';
   }).join('');
-  const best = a.longest ? `<p class="small">Najdłuższy zjazd: nr ${a.longest.no}, ${fmtDist(a.longest.dist)}. Stuknij zjazd, żeby zobaczyć go na mapie.</p>` : '';
+  const best = a.longest ? `<p class="small">${t('h.longest', { n: a.longest.no, d: fmtDist(a.longest.dist) })}</p>` : '';
   return `<div class="detail">${head}${nums}<div class="box">${profileSvg(a)}</div>${best}<ol class="tl">${items}</ol>
-    <div class="actions"><button class="btn sm" data-act="dayall">Cały dzień na mapie</button><button class="btn sm" data-act="daygpx">Zapisz GPX</button><button class="btn sm" data-act="days">Historia dni</button></div></div>`;
+    <div class="actions"><button class="btn sm" data-act="dayall">${t('h.all')}</button><button class="btn sm" data-act="daygpx">${t('h.gpx')}</button><button class="btn sm" data-act="days">${t('s.days')}</button></div></div>`;
 }
 function restName(s) {
   const mid = s.pts[Math.floor(s.pts.length / 2)], poi = S.net?.nearPoi(mid[0], mid[1], 120);
-  return poi ? `Przerwa: ${poi.name}` : 'Przerwa';
+  return poi ? t('h.breakAt', { name: poi.name }) : t('h.break');
 }
 function fmtHM(sec) { const m = Math.round(sec / 60); return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` : `${m} min`; }
 
@@ -241,13 +241,13 @@ async function openDays() {
   tick(true);
 }
 function daysViewHtml() {
-  const head = `<div class="dhead"><div class="t"><b>Historia dni</b><span>Każdy dzień zapisuje się w telefonie sam</span></div><button class="close" data-act="back" aria-label="Zamknij">×</button></div>`;
-  if (!daysList) return `<div class="detail">${head}<p class="small">Wczytuję…</p></div>`;
-  if (!daysList.length) return `<div class="detail">${head}<div class="empty">Nie ma jeszcze zapisanych dni. Po pierwszym dniu na stoku pojawi się tu podsumowanie.</div></div>`;
+  const head = `<div class="dhead"><div class="t"><b>${t('s.days')}</b><span>${t('h.listSub')}</span></div><button class="close" data-act="back" aria-label="${t('a.close')}">×</button></div>`;
+  if (!daysList) return `<div class="detail">${head}<p class="small">${t('h.loading')}</p></div>`;
+  if (!daysList.length) return `<div class="detail">${head}<div class="empty">${t('h.noDays')}</div></div>`;
   const tot = daysList.reduce((a, d) => ({ km: a.km + d.skiM, v: a.v + d.vertM, mx: Math.max(a.mx, d.maxV), runs: a.runs + d.runs }), { km: 0, v: 0, mx: 0, runs: 0 });
   return `<div class="detail">${head}
-    <div class="box"><h3>Sezon</h3><div class="nums"><div><b>${daysList.length}</b><span>dni</span></div><div><b>${km(tot.km)}</b><span>km zjazdów</span></div><div><b>${km(tot.v)}</b><span>km w dół</span></div><div><b>${tot.mx ? Math.round(tot.mx * 3.6) : '–'}</b><span>km/h max</span></div></div></div>
-    <div class="daylist">${daysList.map(d => `<button class="dayrow" data-act="day" data-d="${esc(d.date)}"><span><b>${d.date === todayKey() ? 'Dziś' : esc(dayTitle(d.date))}</b><br><span>${km(d.skiM)} km · ${d.runs} zjazdów · ${Math.round(d.vertM).toLocaleString('pl-PL')} m w dół</span></span><span class="mx">${d.maxV ? Math.round(d.maxV * 3.6) + ' km/h' : ''}</span></button>`).join('')}</div></div>`;
+    <div class="box"><h3>${t('h.season')}</h3><div class="nums"><div><b>${daysList.length}</b><span>${t('h.days')}</span></div><div><b>${km(tot.km)}</b><span>${t('s.skiKm')}</span></div><div><b>${km(tot.v)}</b><span>${t('h.kmDown')}</span></div><div><b>${tot.mx ? Math.round(tot.mx * 3.6) : '–'}</b><span>${t('s.maxKmh')}</span></div></div></div>
+    <div class="daylist">${daysList.map(d => `<button class="dayrow" data-act="day" data-d="${esc(d.date)}"><span><b>${d.date === todayKey() ? t('h.today') : esc(dayTitle(d.date))}</b><br><span>${t('h.row', { km: km(d.skiM), runs: d.runs, v: fmt0(d.vertM) })}</span></span><span class="mx">${d.maxV ? Math.round(d.maxV * 3.6) + ' km/h' : ''}</span></button>`).join('')}</div></div>`;
 }
 
 /* ---------- wiring ---------- */
@@ -263,7 +263,7 @@ async function stepDay(dir) {
   if (!recs.includes(todayKey())) recs.push(todayKey());
   recs.sort((a, b) => dayKeyDate(a) - dayKeyDate(b));
   const i = recs.indexOf(S.view.date), next = recs[i + dir];
-  if (next) openDay(next); else toast(dir < 0 ? 'To najstarszy zapisany dzień' : 'To ostatni dzień');
+  if (next) openDay(next); else toast(t(dir < 0 ? 'h.oldest' : 'h.last'));
 }
 HOOK.act.dayprev = () => stepDay(-1);
 HOOK.act.daynext = () => stepDay(1);

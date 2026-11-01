@@ -1,0 +1,3 @@
+/* Location permission texts */
+"NSLocationWhenInUseUsageDescription" = "Ekipa pokazuje znajomym z Twojej grupy, gdzie jesteś na stoku.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Pozwól na lokalizację „Zawsze”, żeby znajomi widzieli Cię także przy zablokowanym telefonie w kieszeni.";

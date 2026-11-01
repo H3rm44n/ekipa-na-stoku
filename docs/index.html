@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<title>Ekipa na Stoku</title>
+<title>Ekipa</title>
 <meta name="theme-color" content="#0f2a44">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -12,8 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <style>
 /* Layout: full-bleed map, signage-style top bar, bottom sheet with the crew list */
@@ -300,6 +299,17 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 .picon.lift,.picon.top{background:#7b2fbe}
 #btnNav.stop{background:var(--ink);border-color:var(--ink);color:var(--snow)}
 .card.gather{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+/* language picker, terms, chat message actions */
+.langsel{height:36px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 14px var(--body);padding:0 8px;max-width:150px}
+.langsel.wide{max-width:none;width:100%;height:42px;margin-top:4px}
+.toggle.terms{justify-content:flex-start;gap:10px;font-size:13px;line-height:1.35}
+.toggle.terms input{flex:none}
+.toggle.terms a{color:var(--accent)}
+.note a{color:var(--accent)}
+.msg{position:relative}
+.msgmore{position:absolute;top:2px;right:4px;border:0;background:none;color:inherit;opacity:.55;font-size:16px;line-height:1;padding:2px 4px}
+.msg:not(.mine){padding-right:26px}
+.msgacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 @media (prefers-reduced-motion:reduce){.fm .pulse{animation:none;display:none}}
 </style>
 </head>
@@ -307,114 +317,114 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 <div id="map"></div>
 
 <header class="topbar">
-  <div class="brand"><i></i>Ekipa</div>
+  <div class="brand"><i></i><span data-i="brand">Ekipa</span></div>
   <div class="spacer"></div>
-  <button class="chip" id="connChip" title="Połączenie"><span class="dot" id="connDot"></span><span id="connTxt">…</span></button>
-  <button class="iconbtn" id="btnSettings" aria-label="Ustawienia"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  <button class="chip" id="connChip" data-i-aria="h.conn"><span class="dot" id="connDot"></span><span id="connTxt">…</span></button>
+  <button class="iconbtn" id="btnSettings" data-i-aria="h.settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 </header>
 
 <div class="rcol" id="rcol">
-  <button class="sosfab" id="btnSos" aria-label="SOS – alarm dla ekipy">SOS</button>
-  <button class="rbtn" id="btnChat" aria-label="Czat ekipy"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Czat<span class="badge" id="chatBadge" hidden></span></button>
-  <button class="rbtn" id="btnNav" aria-label="Prowadź do znajomego"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>Prowadź</button>
-  <button class="rbtn st" id="btnStatus" aria-haspopup="true" aria-expanded="false"><span id="stLabel">Jeżdżę</span> <small aria-hidden="true">▾</small></button>
+  <button class="sosfab" id="btnSos" data-i-aria="h.sos">SOS</button>
+  <button class="rbtn" id="btnChat" data-i-aria="h.chatAria"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span data-i="h.chat">Czat</span><span class="badge" id="chatBadge" hidden></span></button>
+  <button class="rbtn" id="btnNav" data-i-aria="rb.navAria"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>…</button>
+  <button class="rbtn st" id="btnStatus" aria-haspopup="true" aria-expanded="false"><span id="stLabel"></span> <small aria-hidden="true">▾</small></button>
   <div class="stmenu" id="stMenu" role="menu" hidden></div>
 </div>
 
 <div class="banner" id="banner" hidden></div>
 
 <div class="fabs">
-  <button class="iconbtn" id="btnLayers" aria-label="Zmień podkład mapy"><svg viewBox="0 0 24 24"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 16 10 6 10-6"/></svg></button>
-  <button class="iconbtn" id="btnFit" aria-label="Pokaż wszystkich"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
-  <button class="iconbtn" id="btnMe" aria-label="Moja pozycja"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+  <button class="iconbtn" id="btnLayers" data-i-aria="h.layers"><svg viewBox="0 0 24 24"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 16 10 6 10-6"/></svg></button>
+  <button class="iconbtn" id="btnFit" data-i-aria="h.fit"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <button class="iconbtn" id="btnMe" data-i-aria="h.me"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
 </div>
 
 <section class="sheet" id="sheet">
-  <button class="handle" id="handle" aria-label="Rozwiń listę"><span></span></button>
+  <button class="handle" id="handle" data-i-aria="h.handle"><span></span></button>
   <div id="sheetBody"></div>
 </section>
 
 <div class="modal" id="setup" hidden>
   <form class="panel" id="setupForm">
-    <h1>Ekipa na stoku</h1>
-    <p>Widzisz na mapie stoku, gdzie są znajomi, dokąd jadą i jak do nich dojechać.</p>
+    <div class="dhead"><h1 class="t" data-i="su.title" style="margin:0">Ekipa na stoku</h1><select id="inLang" class="langsel" data-i-aria="su.lang"></select></div>
+    <p data-i="su.lead"></p>
     <div class="names">
-      <label for="inNick">Ksywka<input type="text" id="inNick" maxlength="20" autocomplete="nickname" placeholder="np. Hermes"></label>
-      <label for="inFirst">Imię<input type="text" id="inFirst" maxlength="20" autocomplete="given-name" placeholder="np. Kuba"></label>
-      <label for="inLast"><span>Nazwisko <span class="opt">(nieobowiązkowe)</span></span><input type="text" id="inLast" maxlength="30" autocomplete="family-name"></label>
-      <p class="note">Wpisz ksywkę albo imię. Na mapie znajomi zobaczą ksywkę, a jeśli jej nie podasz, imię.</p>
+      <label for="inNick"><span data-i="su.nick"></span><input type="text" id="inNick" maxlength="20" autocomplete="nickname" data-i-ph="su.nickPh"></label>
+      <label for="inFirst"><span data-i="su.first"></span><input type="text" id="inFirst" maxlength="20" autocomplete="given-name" data-i-ph="su.firstPh"></label>
+      <label for="inLast"><span><span data-i="su.last"></span> <span class="opt" data-i="su.opt"></span></span><input type="text" id="inLast" maxlength="30" autocomplete="family-name"></label>
+      <p class="note" data-i="su.nameNote"></p>
     </div>
-    <div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Kolor na mapie</div><div class="colors" id="inColors"></div></div>
-    <label for="inGroup">Kod grupy (taki sam u wszystkich)
+    <div><div style="font-weight:600;font-size:13px;margin-bottom:6px" data-i="su.color"></div><div class="colors" id="inColors"></div></div>
+    <label for="inGroup"><span data-i="su.group"></span>
       <div class="rowflex"><input type="text" id="inGroup" maxlength="40" autocapitalize="none" autocomplete="off" spellcheck="false" required>
-      <button type="button" class="btn" id="btnGen">Losuj</button></div>
+      <button type="button" class="btn" id="btnGen" data-i="su.gen"></button></div>
     </label>
-    <p class="note">Kod grupy szyfruje pozycje. Kto go nie zna, nie zobaczy, gdzie jesteście. Wyślij go znajomym razem z linkiem do aplikacji.</p>
-    <button class="btn primary" type="submit">Dołącz do ekipy</button>
+    <p class="note" data-i="su.groupNote"></p>
+    <label class="toggle terms"><input type="checkbox" id="inTerms"><span data-i-html="su.terms"></span></label>
+    <button class="btn primary" type="submit" data-i="su.join"></button>
   </form>
 </div>
 
 <div class="modal" id="settings" hidden>
   <div class="panel">
-    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase">Ustawienia</b></div><button class="close" data-close aria-label="Zamknij">×</button></div>
+    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase" data-i="se.title"></b></div><button class="close" data-close data-i-aria="a.close">×</button></div>
+    <label for="stLang"><span data-i="su.lang"></span><select id="stLang" class="langsel wide"></select></label>
     <div class="names">
-      <label for="stNick">Ksywka<input type="text" id="stNick" maxlength="20" autocomplete="nickname"></label>
-      <label for="stFirst">Imię<input type="text" id="stFirst" maxlength="20" autocomplete="given-name"></label>
-      <label for="stLast"><span>Nazwisko <span class="opt">(nieobowiązkowe)</span></span><input type="text" id="stLast" maxlength="30" autocomplete="family-name"></label>
+      <label for="stNick"><span data-i="su.nick"></span><input type="text" id="stNick" maxlength="20" autocomplete="nickname"></label>
+      <label for="stFirst"><span data-i="su.first"></span><input type="text" id="stFirst" maxlength="20" autocomplete="given-name"></label>
+      <label for="stLast"><span><span data-i="su.last"></span> <span class="opt" data-i="su.opt"></span></span><input type="text" id="stLast" maxlength="30" autocomplete="family-name"></label>
     </div>
-    <div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Kolor</div><div class="colors" id="stColors"></div></div>
-    <div class="box"><h3>Kod grupy</h3><div class="rowflex" style="align-items:center"><code id="stGroup" style="flex:1;font-size:16px;font-weight:600;user-select:all;word-break:break-all"></code><button class="btn" id="btnCopy">Kopiuj</button></div>
-      <p class="note" style="margin-top:6px">„Zaproś” otwiera systemowe Udostępnij: AirDrop, WhatsApp, Messenger, SMS.</p>
-      <div class="actions" style="margin-top:8px"><button class="btn" id="btnGroup">Członkowie i admini</button></div></div>
+    <div><div style="font-weight:600;font-size:13px;margin-bottom:6px" data-i="se.color"></div><div class="colors" id="stColors"></div></div>
+    <div class="box"><h3 data-i="se.code"></h3><div class="rowflex" style="align-items:center"><code id="stGroup" style="flex:1;font-size:16px;font-weight:600;user-select:all;word-break:break-all"></code><button class="btn" id="btnCopy" data-i="inv.btn"></button></div>
+      <p class="note" style="margin-top:6px" data-i="se.shareNote"></p>
+      <div class="actions" style="margin-top:8px"><button class="btn" id="btnGroup" data-i="se.members"></button></div></div>
     <div class="hr"></div>
-    <div class="box"><h3>Bateria i GPS</h3><p class="small" id="stBatt">–</p></div>
-    <label class="toggle" for="stEco">Tryb oszczędny (rzadszy GPS przy zjazdach)<input type="checkbox" id="stEco"></label>
-    <label class="toggle" for="stWake">Nie wygaszaj ekranu (lepsze śledzenie)<input type="checkbox" id="stWake"></label>
-    <div class="box"><h3>Ukryj mnie na chwilę</h3><div class="opts"><button class="btn sm" data-hide="30">30 min</button><button class="btn sm" data-hide="60">1 h</button><button class="btn sm" data-hide="120">2 h</button></div><p class="note" style="margin-top:6px">Znikniesz z mapy znajomych, a potem pojawisz się sam. SOS zawsze pokazuje Twoją pozycję.</p></div>
-    <label class="toggle" for="stShare">Udostępniaj moją pozycję<input type="checkbox" id="stShare"></label>
-    <label class="toggle" for="stDemo">Tryb demo (symulowani znajomi)<input type="checkbox" id="stDemo"></label>
+    <div class="box"><h3 data-i="se.batt"></h3><p class="small" id="stBatt">–</p></div>
+    <label class="toggle" for="stEco"><span data-i="se.eco"></span><input type="checkbox" id="stEco"></label>
+    <label class="toggle" for="stWake"><span data-i="se.wake"></span><input type="checkbox" id="stWake"></label>
+    <div class="box"><h3 data-i="se.hide"></h3><div class="opts"><button class="btn sm" data-hide="30">30 min</button><button class="btn sm" data-hide="60">1 h</button><button class="btn sm" data-hide="120">2 h</button></div><p class="note" style="margin-top:6px" data-i="se.hideNote"></p></div>
+    <label class="toggle" for="stShare"><span data-i="se.share"></span><input type="checkbox" id="stShare"></label>
+    <label class="toggle" for="stDemo"><span data-i="se.demo"></span><input type="checkbox" id="stDemo"></label>
     <div class="hr"></div>
-    <div class="box"><h3>Mapa tras</h3><p class="small" id="stNet">–</p>
-      <div class="actions" style="margin-top:8px"><button class="btn" id="btnNetResort">Madonna di Campiglio</button><button class="btn" id="btnNetHere">Ośrodek w widoku mapy</button></div></div>
-    <div class="actions"><button class="btn primary" id="btnSave">Zapisz</button><button class="btn" id="btnLeave" style="color:var(--bad)">Opuść grupę</button></div>
-    <details class="box"><summary style="font-weight:600;cursor:pointer">Licencje i źródła danych</summary><p class="note" style="margin-top:6px">
-      Dane tras, wyciągów i schronisk: © współtwórcy OpenStreetMap, licencja ODbL (openstreetmap.org/copyright).<br>
-      Mapa topograficzna: © OpenTopoMap (CC-BY-SA), dane SRTM. Mapa OSM: © współtwórcy OpenStreetMap. Zdjęcia satelitarne: Esri, Maxar, Earthstar Geographics.<br>
-      Oprogramowanie: Leaflet (BSD-2), MQTT.js (MIT), Capacitor (MIT), czcionki Barlow (SIL OFL 1.1).<br>
-      SOS powiadamia tylko Twoją ekipę i nie zastępuje numeru alarmowego 112.</p></details>
-    <p class="note">Pozycje przesyłane są zaszyfrowane (AES‑GCM, klucz z kodu grupy) przez publiczne serwery MQTT HiveMQ i EMQX. Trasy i wyciągi: © OpenStreetMap. W aplikacji na iPhone GPS sam przechodzi w tryb oszczędny, gdy stoisz, jedziesz wyciągiem albo jesteś poza stokiem.</p>
+    <div class="box"><h3 data-i="se.net"></h3><p class="small" id="stNet">–</p>
+      <div class="actions" style="margin-top:8px"><button class="btn" id="btnNetResort">Madonna di Campiglio</button><button class="btn" id="btnNetHere" data-i="se.netHere"></button></div></div>
+    <div class="actions"><button class="btn primary" id="btnSave" data-i="se.save"></button><button class="btn" id="btnLeave" style="color:var(--bad)" data-i="leave"></button></div>
+    <details class="box"><summary style="font-weight:600;cursor:pointer" data-i="se.lic"></summary><p class="note" style="margin-top:6px" data-i-html="se.licText"></p></details>
+    <p class="note" data-i-html="se.links"></p>
+    <p class="note" data-i="se.note"></p>
   </div>
 </div>
 
 <div class="modal" id="meet" hidden>
   <form class="panel" id="meetForm">
-    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase" id="mfTitle">Spotkanie</b><span id="mfSub">Ekipa dostanie zaproszenie i trasę dojazdu</span></div><button type="button" class="close" data-close aria-label="Zamknij">×</button></div>
-    <label for="mfPlace">Miejsce<input type="text" id="mfPlace" maxlength="60" placeholder="np. Rifugio Graffer"></label>
-    <label for="mfTime">Godzina<input type="time" id="mfTime" step="300"></label>
-    <div class="opts"><button type="button" class="btn sm" data-plus="15">za 15 min</button><button type="button" class="btn sm" data-plus="30">za 30 min</button><button type="button" class="btn sm" data-plus="60">za 1 h</button><button type="button" class="btn sm" data-plus="90">za 1,5 h</button></div>
-    <label for="mfNote">Notatka <span class="opt">(nieobowiązkowa)</span><input type="text" id="mfNote" maxlength="100" placeholder="np. obiad, bierzemy stolik na tarasie"></label>
-    <button class="btn primary" type="submit">Wyślij do ekipy</button>
+    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase" id="mfTitle"></b><span id="mfSub"></span></div><button type="button" class="close" data-close data-i-aria="a.close">×</button></div>
+    <label for="mfPlace"><span data-i="mf.place"></span><input type="text" id="mfPlace" maxlength="60" data-i-ph="mf.placePh"></label>
+    <label for="mfTime"><span data-i="mf.time"></span><input type="time" id="mfTime" step="300"></label>
+    <div class="opts"><button type="button" class="btn sm" data-plus="15" data-i="mf.p15"></button><button type="button" class="btn sm" data-plus="30" data-i="mf.p30"></button><button type="button" class="btn sm" data-plus="60" data-i="mf.p60"></button><button type="button" class="btn sm" data-plus="90" data-i="mf.p90"></button></div>
+    <label for="mfNote"><span><span data-i="mf.note"></span> <span class="opt" data-i="mf.optF"></span></span><input type="text" id="mfNote" maxlength="100" data-i-ph="mf.notePh"></label>
+    <button class="btn primary" type="submit" data-i="mf.send"></button>
   </form>
 </div>
 
 <div class="modal" id="chat" hidden>
   <div class="panel chatpanel">
-    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase">Czat ekipy</b><span id="chatSub">Wiadomości z dzisiaj, szyfrowane kodem grupy</span></div><button class="close" data-close aria-label="Zamknij">×</button></div>
+    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase" data-i="ch.title"></b><span id="chatSub" data-i="ch.sub"></span></div><button class="close" data-close data-i-aria="a.close">×</button></div>
     <div class="chatlist" id="chatList"></div>
     <div class="opts quick" id="chatQuick"></div>
-    <form class="chatform" id="chatForm"><input type="text" id="chatText" maxlength="300" placeholder="Napisz do ekipy…" autocomplete="off" enterkeyhint="send"><button class="btn primary" type="submit">Wyślij</button></form>
+    <form class="chatform" id="chatForm"><input type="text" id="chatText" maxlength="300" data-i-ph="ch.ph" autocomplete="off" enterkeyhint="send"><button class="btn primary" type="submit" data-i="ch.send"></button></form>
   </div>
 </div>
 
 <div class="modal" id="group" hidden>
   <div class="panel">
-    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase" id="grpTitle">Grupa</b><span id="grpSub"></span></div><button class="close" data-close aria-label="Zamknij">×</button></div>
+    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase" id="grpTitle"></b><span id="grpSub"></span></div><button class="close" data-close data-i-aria="a.close">×</button></div>
     <div id="grpBody"></div>
   </div>
 </div>
 
 <div class="toast" id="toast" hidden></div>
 
+<script src="i18n.js"></script>
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/mqtt.min.js"></script>
 <script src="vendor/capacitor.js"></script>

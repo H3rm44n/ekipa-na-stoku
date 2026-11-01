@@ -1,0 +1,3 @@
+/* Location permission texts */
+"NSLocationWhenInUseUsageDescription" = "Ekipa visar vännerna i din grupp var du är i backen.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Tillåt ”Alltid” så att vänner ser dig även med låst telefon i fickan.";

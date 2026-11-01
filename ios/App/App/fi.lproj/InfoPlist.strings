@@ -1,0 +1,3 @@
+/* Location permission texts */
+"NSLocationWhenInUseUsageDescription" = "Ekipa näyttää ryhmäsi kavereille, missä olet rinteessä.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Salli ”Aina”, niin kaverit näkevät sinut myös lukitulla puhelimella taskussa.";

@@ -5,7 +5,36 @@
 	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>pl</string>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>bg</string>
+		<string>cs</string>
+		<string>da</string>
+		<string>de</string>
+		<string>el</string>
+		<string>en</string>
+		<string>es</string>
+		<string>et</string>
+		<string>fi</string>
+		<string>fr</string>
+		<string>ga</string>
+		<string>hr</string>
+		<string>hu</string>
+		<string>it</string>
+		<string>lt</string>
+		<string>lv</string>
+		<string>mt</string>
+		<string>nl</string>
+		<string>pl</string>
+		<string>pt</string>
+		<string>ro</string>
+		<string>sk</string>
+		<string>sl</string>
+		<string>sv</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleDisplayName</key>
 	<string>Ekipa</string>
 	<key>CFBundleExecutable</key>
@@ -25,9 +54,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Pozwól na lokalizację „Zawsze”, żeby znajomi widzieli Cię także przy zablokowanym telefonie w kieszeni.</string>
+	<string>Allow “Always” so friends can see you even with the phone locked in your pocket.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Ekipa pokazuje znajomym z Twojej grupy, gdzie jesteś na stoku.</string>
+	<string>Ekipa shows the friends in your group where you are on the slopes.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

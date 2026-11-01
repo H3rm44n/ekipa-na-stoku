@@ -74,7 +74,7 @@ window.addEventListener('pagehide', saveTrack);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveTrack(); });
 
 async function exportGpx(track = dayTrack) {
-  if (track.pts.length < 2) { toast('Brak śladu do zapisania'); return; }
+  if (track.pts.length < 2) { toast(t('t.noTrack')); return; }
   const pts = track.pts.map(p => `<trkpt lat="${p[0]}" lon="${p[1]}">${p[2] != null ? `<ele>${p[2]}</ele>` : ''}<time>${new Date(p[3]).toISOString()}</time></trkpt>`).join('');
   const gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Ekipa na Stoku" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Narty ${track.date}</name><trkseg>${pts}</trkseg></trk></gpx>`;
   const name = `narty-${track.date}.gpx`;
@@ -84,7 +84,7 @@ async function exportGpx(track = dayTrack) {
 }
 
 /* ---------- sharing + display ---------- */
-const km = m => (m / 1000).toFixed(1).replace('.', ',');
+const km = m => fmt1(m / 1000);
 HOOK.out.push(() => { const st = dayStats(); return { sd: S.day.date, st: [Math.round(st.skiM), Math.round(st.liftM), Math.round(st.vertM), st.runs, Math.round(st.maxV * 10)] }; });
 HOOK.friend.push((f, m) => {
   if (m.sd === todayKey() && Array.isArray(m.st)) { const [a, b, c, d, e] = m.st.map(Number); f.st = { skiM: a, liftM: b, vertM: c, runs: d, maxV: e / 10 }; }
@@ -95,27 +95,27 @@ HOOK.pos.push(statsOnPos);
 function myDayCard() {
   const st = dayStats();
   const has = st.skiM + st.liftM > 0;
-  return `<div class="card stats"><div class="card-h"><b>Twój dzień</b><span class="small">${has ? '' : 'liczy się od pierwszego zjazdu'}</span></div>
+  return `<div class="card stats"><div class="card-h"><b>${t('s.myDay')}</b><span class="small">${has ? '' : t('s.fromFirst')}</span></div>
     <div class="nums">
-      <div><b>${km(st.skiM)}</b><span>km zjazdów</span></div>
-      <div><b>${km(st.liftM)}</b><span>km wyciągami</span></div>
-      <div><b>${st.maxV ? Math.round(st.maxV * 3.6) : '–'}</b><span>km/h max</span></div>
-      <div><b>${st.runs}</b><span>zjazdów</span></div>
+      <div><b>${km(st.skiM)}</b><span>${t('s.skiKm')}</span></div>
+      <div><b>${km(st.liftM)}</b><span>${t('s.liftKm')}</span></div>
+      <div><b>${st.maxV ? Math.round(st.maxV * 3.6) : '–'}</b><span>${t('s.maxKmh')}</span></div>
+      <div><b>${st.runs}</b><span>${t('s.runs')}</span></div>
     </div>
-    <div class="small">${Math.round(st.vertM).toLocaleString('pl-PL')} m w dół · razem ${km(st.skiM + st.liftM)} km</div>
-    <div class="actions"><button class="btn sm primary" data-act="day" data-d="${todayKey()}">Przebieg dnia</button><button class="btn sm" data-act="days">Historia dni</button></div></div>`;
+    <div class="small">${t('s.vertTotal', { v: fmt0(st.vertM), k: km(st.skiM + st.liftM) })}</div>
+    <div class="actions"><button class="btn sm primary" data-act="day" data-d="${todayKey()}">${t('s.dayView')}</button><button class="btn sm" data-act="days">${t('s.days')}</button></div></div>`;
 }
 
 HOOK.rank = () => {
-  const me = { id: 'me', name: displayName(S.me) + ' (Ty)', color: S.me.color, st: dayStats() };
+  const me = { id: 'me', name: t('r.you', { name: displayName(S.me) }), color: S.me.color, st: dayStats() };
   const rows = [me, ...visibleFriends().filter(f => f.st)];
-  if (rows.length < 2 && !(me.st.skiM + me.st.liftM)) return myDayCard() + '<div class="empty">Ranking wypełni się, gdy ekipa zacznie jeździć. Każdy telefon liczy swoje kilometry i prędkość sam, a tu widać wszystkich.</div>';
+  if (rows.length < 2 && !(me.st.skiM + me.st.liftM)) return myDayCard() + `<div class="empty">${t('r.empty')}</div>`;
   const leader = key => rows.reduce((a, b) => (b.st[key] > (a?.st[key] || 0) ? b : a), null);
   const kmL = leader('skiM'), vL = leader('maxV'), vertL = leader('vertM');
   rows.sort((a, b) => b.st.skiM - a.st.skiM);
   const badge = (txt, who) => who && who.st ? `<div class="lead"><span>${txt}</span><b style="color:${who.color}">${esc(who.name)}</b></div>` : '';
-  return myDayCard() + `<div class="leads">${badge('Najwięcej km', kmL)}${badge('Najszybszy', vL)}${badge('Największe przewyższenie', vertL)}</div>
-  <div class="tablewrap"><table class="rank"><thead><tr><th></th><th>Kto</th><th>Zjazdy</th><th>Wyciągi</th><th>Max</th><th>Zjazdów</th></tr></thead><tbody>
+  return myDayCard() + `<div class="leads">${badge(t('r.mostKm'), kmL)}${badge(t('r.fastest'), vL)}${badge(t('r.mostVert'), vertL)}</div>
+  <div class="tablewrap"><table class="rank"><thead><tr><th></th><th>${t('r.who')}</th><th>${t('r.runsKm')}</th><th>${t('r.liftsKm')}</th><th>${t('r.max')}</th><th>${t('r.count')}</th></tr></thead><tbody>
   ${rows.map((r, i) => `<tr${r.id === 'me' ? ' class="me"' : ''}><td>${i + 1}</td><td><span class="dotc" style="background:${r.color}"></span>${esc(r.name)}</td><td>${km(r.st.skiM)} km</td><td>${km(r.st.liftM)} km</td><td>${r.st.maxV ? Math.round(r.st.maxV * 3.6) + ' km/h' : '–'}</td><td>${r.st.runs}</td></tr>`).join('')}
-  </tbody></table></div><p class="note">Liczone od północy. Prędkość tylko na trasach, przy dobrym sygnale GPS.</p>`;
+  </tbody></table></div><p class="note">${t('r.note')}</p>`;
 };

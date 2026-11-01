@@ -1,0 +1,3 @@
+/* Location permission texts */
+"NSLocationWhenInUseUsageDescription" = "Ekipa prijateljem iz tvoje skupine pokaže, kje si na smučišču.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Dovoli »Vedno«, da te prijatelji vidijo tudi z zaklenjenim telefonom v žepu.";

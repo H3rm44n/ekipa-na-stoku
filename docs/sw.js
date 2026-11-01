@@ -1,6 +1,6 @@
 // Offline shell + map tiles you have already seen (useful where the slope has weak signal).
-const SHELL = 'ekipa-shell-v9', TILES = 'ekipa-tiles-v1', MAX_TILES = 2500;
-const ASSETS = ['./', 'index.html', 'app.js', 'net.js', 'stats.js', 'social.js', 'crew.js', 'history.js', 'manifest.webmanifest', 'icon.svg',
+const SHELL = 'ekipa-shell-v11', TILES = 'ekipa-tiles-v1', MAX_TILES = 2500;
+const ASSETS = ['./', 'index.html', 'app.js', 'net.js', 'stats.js', 'social.js', 'crew.js', 'history.js', 'i18n.js', 'i18n/en.js', 'fonts/fonts.css', 'data/skirama.json', 'manifest.webmanifest', 'icon.svg',
   'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/mqtt.min.js', 'vendor/capacitor.js'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(ASSETS)).catch(() => {})); self.skipWaiting(); });
@@ -9,7 +9,7 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-const isTile = u => /tile\.opentopomap\.org|tile\.openstreetmap\.org|arcgisonline\.com/.test(u);
+const isTile = u => /tile\.opentopomap\.org|tile\.openstreetmap\.org|arcgisonline\.com|api\.maptiler\.com\/maps/.test(u);
 let n = 0;
 async function trim() {
   const c = await caches.open(TILES), keys = await c.keys();

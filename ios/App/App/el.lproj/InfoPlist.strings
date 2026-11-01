@@ -1,0 +1,3 @@
+/* Location permission texts */
+"NSLocationWhenInUseUsageDescription" = "Η Ekipa δείχνει στους φίλους της ομάδας σου πού βρίσκεσαι στις πίστες.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Επίτρεψε «Πάντα» για να σε βλέπουν οι φίλοι ακόμα και με κλειδωμένο κινητό στην τσέπη.";

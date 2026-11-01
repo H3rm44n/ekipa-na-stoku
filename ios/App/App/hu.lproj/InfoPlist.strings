@@ -1,0 +1,3 @@
+/* Location permission texts */
+"NSLocationWhenInUseUsageDescription" = "Az Ekipa megmutatja a csoportod tagjainak, hol vagy a pályán.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Engedélyezd a „Mindig” beállítást, hogy a barátaid lezárt, zsebben lévő telefonnal is lássanak.";
