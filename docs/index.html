@@ -61,8 +61,11 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* bottom sheet */
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:1002;background:var(--card);border-radius:18px 18px 0 0;box-shadow:0 -6px 30px rgba(15,42,68,.22);
   padding:0 max(14px,env(safe-area-inset-right)) calc(var(--sab) + 10px) max(14px,env(safe-area-inset-left));max-height:62vh;display:flex;flex-direction:column}
-.handle{display:flex;justify-content:center;padding:8px 0 4px;border:0;background:none;width:100%}
-.handle span{width:42px;height:5px;border-radius:3px;background:var(--line)}
+.handle{display:flex;justify-content:center;padding:10px 0 8px;border:0;background:none;width:100%;touch-action:none;cursor:ns-resize}
+.handle span{width:48px;height:5px;border-radius:3px;background:var(--line)}
+#sheetBody{display:flex;flex-direction:column;min-height:0;flex:1}
+.sheet.sized{max-height:none}
+.sheet.sized .list{max-height:none;flex:1}
 .sheet h2{font:700 15px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:4px 0 8px;display:flex;align-items:center;gap:8px}
 .sheet h2 .count{background:var(--snow);border:1px solid var(--line);border-radius:10px;padding:2px 8px;font-size:12px;color:var(--ink)}
 .list{overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:2px;min-height:0}
@@ -196,6 +199,13 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 .rank tr.me td{font-weight:700}
 /* map pieces */
 .poi{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:#fff;font:700 12px/1 'Barlow Condensed',sans-serif;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);background:#8a5a2b}
+.lblwrap{background:none;border:0}
+.lbl{transform:translate(-50%,-50%);white-space:nowrap;pointer-events:none;font:700 12px/1 'Barlow Condensed',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.lbl.pref{min-width:20px;height:20px;padding:0 4px;border-radius:10px;display:grid;place-items:center;color:#fff;border:2px solid #fff;font-size:12.5px}
+.lbl.pref.nov{background:#16a34a}.lbl.pref.easy{background:#1d6fe0}.lbl.pref.inter{background:#d42a2a}.lbl.pref.adv{background:#111}.lbl.pref.free{background:#e08a00}
+.lbl.pref.nm{border-radius:6px;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.lbl.lift{background:#22313f;color:#fff;border-radius:5px;padding:3px 5px;font-size:10.5px;letter-spacing:.04em;border:1px solid #fff}
+.lbl.lift b{font-weight:700}
 .poi.bar{background:#b4236b}.poi.cafe{background:#6b4f3a}.poi.food{background:#c2410c}
 .flag{position:relative;width:12px;height:40px}
 .flag::before{content:"";position:absolute;left:0;top:0;width:3px;height:40px;background:#22313f;border-radius:2px}

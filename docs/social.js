@@ -255,7 +255,7 @@ document.addEventListener('click', e => {
   else if (b.dataset.pop === 'here') { setMyPos([lat, lon, null, 5, 0, null], true); toast('Ustawiono Twoją pozycję (demo)'); }
 });
 
-const poiLayer = L.layerGroup(), poiTownLayer = L.layerGroup();   // huts from zoom 14, bars/restaurants from 16
+const poiLayer = L.layerGroup(), poiTownLayer = L.layerGroup();   // huts from zoom 13, bars/restaurants from 15
 const POI_GLYPH = { hut: 'S', bar: 'B', cafe: 'K', food: 'R' };
 function drawPois() {
   poiLayer.clearLayers(); poiTownLayer.clearLayers();
@@ -266,16 +266,20 @@ function drawPois() {
 }
 function syncPoiLayer() {
   const z = map.getZoom();
-  for (const [layer, minZ] of [[poiLayer, 14], [poiTownLayer, 16]]) {
+  for (const [layer, minZ] of [[poiLayer, 13], [poiTownLayer, 15]]) {
     if (z >= minZ && !map.hasLayer(layer)) layer.addTo(map); else if (z < minZ && map.hasLayer(layer)) map.removeLayer(layer);
   }
 }
 map.on('zoomend', syncPoiLayer);
+let poiRetry = 0;
 async function loadPois(force) {
   if (!S.net || !S.netMeta) return;
-  const key = 'ek.poi:' + S.netMeta.bbox.join(',');
+  const key = 'ek.poi2:' + S.netMeta.bbox.join(',');
   let list = !force && LS.get(key, null);
-  if (!list) { try { list = await fetchPois(S.netMeta.bbox); LS.set(key, list); } catch { return; } }
+  if (!list) {
+    try { list = await fetchPois(S.netMeta.bbox); LS.set(key, list); poiRetry = 0; }
+    catch { if (poiRetry < 6) setTimeout(() => loadPois(force), 30e3 * 2 ** poiRetry++); return; }   // Overpass busy: try again later
+  }
   S.net.setPois(list); drawPois(); syncPoiLayer(); tick(true);
 }
 HOOK.netReady.push(() => setTimeout(() => loadPois(), 0));

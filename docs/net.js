@@ -16,6 +16,7 @@ const LINK_R = 60;        // m, how far apart two ways can be and still count as
 const TOWN_R = 400;       // m, walk from a piste bottom to another lift's base station (resort villages)
 
 const LIFT_PL = { cable_car: 'kolej linowa', gondola: 'gondola', mixed_lift: 'gondola/krzesło', chair_lift: 'krzesełko', drag_lift: 'orczyk', 't-bar': 'orczyk', 'j-bar': 'orczyk', platter: 'talerzyk', rope_tow: 'wyciąg linowy', magic_carpet: 'taśma' };
+const LIFT_INSTR = { cable_car: 'kolejką', gondola: 'gondolą', mixed_lift: 'gondolą', chair_lift: 'krzesełkiem', drag_lift: 'orczykiem', 't-bar': 'orczykiem', 'j-bar': 'orczykiem', platter: 'talerzykiem', rope_tow: 'wyciągiem linowym', magic_carpet: 'taśmą' };
 const DIFF_PL = { novice: 'zielona', easy: 'niebieska', intermediate: 'czerwona', advanced: 'czarna', expert: 'czarna', freeride: 'freeride' };
 
 async function fetchSkiData(bbox) {
@@ -55,6 +56,7 @@ function compact(elements) {
       el.id, kind, t.name || t['piste:name'] || t['aerialway:name'] || '',
       t['piste:ref'] || t.ref || '', t['piste:difficulty'] || '', sub,
       +(t['aerialway:duration'] || 0) || 0, t.oneway === 'no' ? 1 : 0, el.nodes, ll,
+      +(t['aerialway:occupancy'] || 0) || 0, (t['aerialway:bubble'] === 'yes' ? 'b' : '') + (t['aerialway:heating'] === 'yes' ? 'h' : ''),
     ]);
   }
   return out;
@@ -75,7 +77,7 @@ class SkiNet {
   P(lat, lon) { return [(lon - this.lon0) * this.kx, (lat - this.lat0) * this.ky]; }
   LL(x, y) { return [this.lat0 + y / this.ky, this.lon0 + x / this.kx]; }
 
-  _addWay([id, kind, name, ref, diff, sub, dur, twoWay, ids, ll]) {
+  _addWay([id, kind, name, ref, diff, sub, dur, twoWay, ids, ll, occ = 0, flags = '']) {
     const wi = this.ways.length, pts = [], cum = [0];
     for (let i = 0; i < ids.length; i++) {
       let n = this.nodes.get(ids[i]);
@@ -92,7 +94,7 @@ class SkiNet {
     if (kind === 'lift') speed = dur > 0 ? Math.max(1, len / (dur * 60)) : LIFT_SPEED[sub] || 4;
     else if (kind === 'conn') speed = 3;
     else speed = PISTE_SPEED[diff] || 7;
-    this.ways.push({ wi, id, kind, name, ref, diff, sub, twoWay: !!twoWay, pts, cum, len, speed });
+    this.ways.push({ wi, id, kind, name, ref, diff, sub, occ, flags, twoWay: !!twoWay, pts, cum, len, speed });
   }
 
   _cell(x, y) { return Math.floor(x / this.G) + ',' + Math.floor(y / this.G); }
@@ -290,6 +292,15 @@ function wayLabel(w) {
   const n = w.name && w.ref && w.name !== w.ref ? `${w.ref} ${w.name}` : (w.name || (w.ref ? `trasa ${w.ref}` : 'trasa bez nazwy'));
   return n;
 }
+// "krzesełko 6-os., osłona, podgrzewane"
+function liftKind(w) {
+  if (!w || w.kind !== 'lift') return '';
+  let t = LIFT_PL[w.sub] || 'wyciąg';
+  if (w.occ > 1 && /chair|mixed|gondola|cable/.test(w.sub)) t += ` ${w.occ}-os.`;
+  if (w.flags?.includes('b')) t += ', osłona';
+  if (w.flags?.includes('h')) t += ', podgrzewane';
+  return t;
+}
 function wayBadge(w) {
   if (!w) return { cls: 'walk', txt: 'PIESZO' };
   if (w.kind === 'lift') return { cls: 'lift', txt: (LIFT_PL[w.sub] || 'wyciąg').toUpperCase() };
@@ -371,7 +382,7 @@ function predict(net, f, now = Date.now()) {
     res.eta = eta; res.endLL = [end.lat, end.lon];
     res.state = onLift ? 'lift' : 'piste';
     res.text = onLift
-      ? `jedzie wyciągiem ${wayLabel(w)} · na górze ${eta < 60 ? 'za chwilę' : 'za ' + fmtMin(eta)}`
+      ? `jedzie ${LIFT_INSTR[w.sub] || 'wyciągiem'} ${wayLabel(w)} · na górze ${eta < 60 ? 'za chwilę' : 'za ' + fmtMin(eta)}`
       : `zjeżdża: ${wayLabel(w)} · koniec trasy ${eta < 60 ? 'za chwilę' : 'za ' + fmtMin(eta)}`;
     // Lift top / piste bottom is where people pause: let a meeting wait there a bit.
     if (res.cand.length) res.cand[res.cand.length - 1].slack = onLift ? 60 : 90;
@@ -403,7 +414,7 @@ function predict(net, f, now = Date.now()) {
   const nn = nearestNode();
   if (nn) res.cand.push({ node: nn[0], t: 0, hold: f.status === 'wait' || f.status === 'hut', slack: 180 });
   if (liftBase && !label) {
-    res.text = `stoi przy wyciągu ${wayLabel(liftBase.w)} · pewnie zaraz wjedzie`;
+    res.text = `stoi przy wyciągu ${wayLabel(liftBase.w)} (${LIFT_PL[liftBase.w.sub] || 'wyciąg'}) · pewnie zaraz wjedzie`;
     res.options.push({ w: liftBase.w, path: liftLL(liftBase.w, 0), t0: 0 });
     pushWayCand(net, res, liftBase.w, 0, LIFT_QUEUE * 0.5);
   } else {
@@ -564,7 +575,8 @@ SkiNet.prototype.setPois = function (list) {
   this.pois = [];
   for (const [kind, name, lat, lon] of list) {
     const [x, y] = this.P(lat, lon);
-    if (this.distToNet(lat, lon, 350) > 300) continue;   // keep places by the slopes, not every pizzeria in town
+    // Keep places by the slopes, not every pizzeria in town; huts can sit a bit off the piste.
+    if (this.distToNet(lat, lon, kind === 'hut' ? 1050 : 350) > (kind === 'hut' ? 1000 : 300)) continue;
     this.pois.push({ kind, name, lat, lon, x, y });
   }
 };

@@ -9,7 +9,7 @@ const LS = {
 };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const RESORT = { name: 'Madonna di Campiglio · Pinzolo · Folgarida-Marilleva', center: [46.2297, 10.8263], bbox: [46.15, 10.70, 46.33, 10.95] };
+const RESORT = { name: 'Madonna di Campiglio · Pinzolo · Folgarida-Marilleva', center: [46.2297, 10.8263], bbox: [46.13, 10.68, 46.36, 10.97] };
 const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
 const COLORS = ['#ff6b00', '#d6249f', '#16a34a', '#7c3aed', '#eab308', '#0891b2', '#a16207', '#e11d48'];
 const STATUSES = [['ride', 'Jeżdżę'], ['wait', 'Czekam na was'], ['hut', 'W schronisku'], ['done', 'Kończę']];
@@ -68,6 +68,7 @@ baseLayers[baseIdx][1].addTo(map);
 const renderer = L.canvas({ padding: 0.3, tolerance: 8 });
 const netLayer = L.layerGroup().addTo(map);
 const arrowLayer = L.layerGroup().addTo(map);
+const labelLayer = L.layerGroup().addTo(map);
 const predLayer = L.layerGroup().addTo(map);
 const routeLayer = L.layerGroup().addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
@@ -114,7 +115,7 @@ function drawNet() {
     else layer = L.polyline(ll, { renderer, color: DIFF_COLOR[w.diff] || '#d42a2a', weight: 3.5, opacity: 0.85 });
     if (w.kind !== 'area') {
       const b = wayBadge(w);
-      layer.bindPopup(`<b>${esc(wayLabel(w))}</b><br><span style="color:#567">${esc(w.kind === 'lift' ? LIFT_PL[w.sub] || 'wyciąg' : (DIFF_PL[w.diff] || b.txt.toLowerCase()))} · ${fmtDist(w.len)}${w.kind === 'lift' ? ' · ~' + fmtMin(w.len / w.speed) : ''}</span>`);
+      layer.bindPopup(`<b>${esc(wayLabel(w))}</b><br><span style="color:#567">${esc(w.kind === 'lift' ? liftKind(w) : (w.ref ? `nr ${w.ref} · ` : '') + (DIFF_PL[w.diff] || b.txt.toLowerCase()))} · ${fmtDist(w.len)}${w.kind === 'lift' ? ' · ~' + fmtMin(w.len / w.speed) : ''}</span>`);
     }
     netLayer.addLayer(layer);
   }
@@ -152,10 +153,51 @@ function drawArrows() {
     arrowLayer.addLayer(L.polyline(segs, { renderer, color, weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', interactive: false }));
   }
 }
-map.on('zoomend moveend', () => { if (!document.hidden) drawArrows(); });
+
+// Piste numbers (like the signs on the slope) and lift types, placed so they don't pile up.
+const LIFT_SHORT = { cable_car: 'KOLEJ', gondola: 'GONDOLA', mixed_lift: 'GONDOLA', chair_lift: 'KRZESŁO', drag_lift: 'ORCZYK', 't-bar': 'ORCZYK', 'j-bar': 'ORCZYK', platter: 'TALERZYK', rope_tow: 'LINKA', magic_carpet: 'TAŚMA' };
+const DIFF_CLS = { novice: 'nov', easy: 'easy', intermediate: 'inter', advanced: 'adv', expert: 'adv', freeride: 'free' };
+function drawLabels() {
+  labelLayer.clearLayers();
+  if (!S.net) return;
+  const z = map.getZoom();
+  if (z < 14) return;
+  const view = map.getBounds().pad(0.1), placed = [], byText = new Map();
+  const free = (p, r) => placed.every(q => Math.hypot(q.x - p.x, q.y - p.y) > r);
+  const at = (w, d) => alongLL(S.net, w, Math.max(0, Math.min(w.len, d)));
+  const ways = S.net.ways.filter(w => w.kind === 'lift' || (w.kind === 'piste' && (w.ref || (z >= 16 && w.name))));
+  ways.sort((a, b) => b.len - a.len);   // long ways first get the best spots
+  for (const w of ways) {
+    const lift = w.kind === 'lift';
+    let html, key;
+    if (lift) {
+      key = 'L' + w.wi;
+      const kind = LIFT_SHORT[w.sub] || 'WYCIĄG', occ = w.occ > 1 && /chair|mixed/.test(w.sub) ? ' ' + w.occ : '';
+      html = `<div class="lbl lift"><b>${kind}${occ}</b>${z >= 16 && w.name ? ' ' + esc(w.name) : ''}</div>`;
+    } else {
+      key = 'P' + (w.ref || w.name);
+      const txt = w.ref || w.name;
+      html = `<div class="lbl pref ${DIFF_CLS[w.diff] || 'inter'}${w.ref ? '' : ' nm'}">${esc(txt)}</div>`;
+    }
+    const step = lift ? Infinity : 1400 * 2 ** (15 - z);
+    const spots = []; for (let d = Math.min(w.len / 2, step / 2); d < w.len; d += step) spots.push(d);
+    for (const d of spots) {
+      const ll = at(w, d);
+      if (!view.contains(ll)) continue;
+      const p = map.latLngToContainerPoint(ll);
+      const same = byText.get(key) || [];
+      if (!lift && same.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 220)) continue;
+      if (!free(p, lift ? 46 : 30)) continue;
+      placed.push(p); same.push(p); byText.set(key, same);
+      labelLayer.addLayer(L.marker(ll, { icon: L.divIcon({ className: 'lblwrap', html, iconSize: null }), interactive: false, keyboard: false, zIndexOffset: -100 }));
+    }
+  }
+}
+map.on('zoomend moveend', () => { if (!document.hidden) { drawArrows(); drawLabels(); } });
 
 async function loadNet(bbox, center, label, force) {
-  const key = 'ek.net:' + bbox.join(',');
+  const key = 'ek.net2:' + bbox.join(',');
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith('ek.net:')) LS.del(k); } catch {}   // old format without lift details
   let data = !force && LS.get(key, null);
   if (!data) {
     showBanner('Pobieram mapę tras i wyciągów z OpenStreetMap…');
@@ -164,13 +206,13 @@ async function loadNet(bbox, center, label, force) {
       showBanner('Nie udało się pobrać tras. Sprawdź internet.', 'Ponów', () => loadNet(bbox, center, label, true));
       return;
     }
-    if (!LS.set(key, data)) { for (const k of Object.keys(localStorage)) if (k.startsWith('ek.net:') && k !== key) LS.del(k); LS.set(key, data); }
+    if (!LS.set(key, data)) { for (const k of Object.keys(localStorage)) if (k.startsWith('ek.net2:') && k !== key) LS.del(k); LS.set(key, data); }
   }
   S.net = new SkiNet(data, center);
   for (const h of HOOK.netReady) try { h(); } catch (err) { console.error(err); }
   S.netMeta = { bbox, center, label }; LS.set('ek.netmeta', S.netMeta);
   hideBanner();
-  drawNet(); drawArrows();
+  drawNet(); drawArrows(); drawLabels();
   const lifts = S.net.ways.filter(w => w.kind === 'lift').length, pistes = S.net.ways.filter(w => w.kind === 'piste').length;
   $('#stNet').textContent = `${label}: ${pistes} odcinków tras, ${lifts} wyciągów.`;
   if (S.me?.demo) startDemo();
@@ -409,17 +451,24 @@ document.addEventListener('visibilitychange', () => { applyWake(); if (document.
 
 /* ---------- demo bots ---------- */
 let demoTimer = null;
-const BOT_NAMES = [['Ania', '#d6249f'], ['Marek', '#16a34a'], ['Zosia', '#7c3aed'], ['Tomek', '#eab308']];
+// Bots near you plus a few in the other parts of the Skirama (Pinzolo, Folgarida-Marilleva).
+const BOT_NAMES = [['Ania', '#d6249f'], ['Marek', '#16a34a'], ['Zosia', '#7c3aed'], ['Tomek', '#eab308'],
+  ['Kasia', '#0891b2', [46.172, 10.778], 'Pinzolo'], ['Piotr', '#ea580c', [46.165, 10.762], 'Pinzolo'],
+  ['Ola', '#db2777', [46.300, 10.865], 'Folgarida'], ['Bartek', '#65a30d', [46.322, 10.812], 'Marilleva']];
 function startDemo() {
   stopDemo();
   if (!S.net) return;
   if (!S.myPos) setMyPos([46.2298, 10.8268, 1520, 8, 0, null], true);
-  const [cx, cy] = S.net.P(S.myPos[0], S.myPos[1]);
-  const lifts = S.net.ways.filter(w => w.kind === 'lift' && w.len > 300).sort((a, b) => Math.hypot(a.pts[0].x - cx, a.pts[0].y - cy) - Math.hypot(b.pts[0].x - cx, b.pts[0].y - cy)).slice(0, 8);
+  const liftsNear = ([lat, lon]) => {
+    const [cx, cy] = S.net.P(lat, lon);
+    return S.net.ways.filter(w => w.kind === 'lift' && w.len > 300).sort((a, b) => Math.hypot(a.pts[0].x - cx, a.pts[0].y - cy) - Math.hypot(b.pts[0].x - cx, b.pts[0].y - cy)).slice(0, 8);
+  };
+  const lifts = liftsNear(S.myPos);
   if (!lifts.length) return;
-  const bots = BOT_NAMES.map(([name, color], i) => {
-    const w = lifts[i % lifts.length];
-    return { id: 'demo-' + i, name, color, w, along: (i * 0.23 % 0.8) * w.len, wait: 0, track: [] };
+  const bots = BOT_NAMES.map(([name, color, anchor], i) => {
+    const near = anchor ? liftsNear(anchor) : lifts;
+    const w = near[i % Math.min(near.length, 3)] || lifts[i % lifts.length];
+    return { id: 'demo-' + i, name, color, w, along: (i * 0.23 % 0.8) * w.len, wait: 0, track: [], home: near.length ? near : lifts };
   });
   const step = () => {
     const now = Date.now(), dt = 2;
@@ -431,7 +480,7 @@ function startDemo() {
           const opts = S.net.continuations(b.w.pts[b.w.pts.length - 1], b.w.wi).filter(o => o.w.len > 120);
           const o = opts.length ? opts[Math.floor(Math.random() * opts.length)] : null;
           if (o) { b.w = o.w; b.along = o.w.cum[o.idx]; b.wait = o.w.kind === 'lift' ? 20 : 4; }
-          else { b.w = lifts[Math.floor(Math.random() * lifts.length)]; b.along = 0; b.wait = 10; }
+          else { b.w = b.home[Math.floor(Math.random() * b.home.length)]; b.along = 0; b.wait = 10; }
         }
       }
       const ll = alongLL(S.net, b.w, Math.min(b.along, b.w.len));
@@ -636,7 +685,35 @@ $('#sheetBody').addEventListener('click', e => {
   else if (act === 'tab') { S.tab = e.target.closest('[data-tab]').dataset.tab; tick(true); }
   else if (HOOK.act[act]) HOOK.act[act](e.target.closest('[data-act]'));
 });
-$('#handle').onclick = () => { S.sheetOpen = !S.sheetOpen; renderSheet(visibleFriends(), true); };
+// Drag the handle to make the sheet taller or shorter (the size is remembered); a tap toggles it as before.
+const sheetEl = $('#sheet'), handleEl = $('#handle');
+let sheetDrag = null;
+function setSheetH(h) {
+  h = Math.max(76, Math.min(innerHeight - 110, h));
+  sheetEl.style.height = h + 'px'; sheetEl.classList.add('sized');
+  document.documentElement.style.setProperty('--sheet-h', h + 'px');
+}
+handleEl.addEventListener('pointerdown', e => { sheetDrag = { y: e.clientY, h: sheetH(), moved: false }; try { handleEl.setPointerCapture(e.pointerId); } catch {} });
+handleEl.addEventListener('pointermove', e => {
+  if (!sheetDrag) return;
+  const dy = sheetDrag.y - e.clientY;
+  if (Math.abs(dy) > 6) sheetDrag.moved = true;
+  if (sheetDrag.moved) { e.preventDefault(); setSheetH(sheetDrag.h + dy); }
+});
+const endDrag = () => {
+  if (!sheetDrag) return;
+  if (sheetDrag.moved) { handleEl.dataset.dragged = '1'; S.sheetOpen = true; LS.set('ek.sheetH', sheetH() / innerHeight); renderSheet(visibleFriends(), true); }
+  sheetDrag = null;
+};
+handleEl.addEventListener('pointerup', endDrag);
+handleEl.addEventListener('pointercancel', endDrag);
+handleEl.onclick = () => {
+  if (handleEl.dataset.dragged) { delete handleEl.dataset.dragged; return; }
+  sheetEl.classList.remove('sized'); sheetEl.style.height = ''; LS.del('ek.sheetH');
+  S.sheetOpen = !S.sheetOpen; renderSheet(visibleFriends(), true);
+};
+{ const r = LS.get('ek.sheetH', null); if (r) { S.sheetOpen = true; setSheetH(r * innerHeight); } }
+addEventListener('resize', () => { const r = LS.get('ek.sheetH', null); if (r && sheetEl.classList.contains('sized')) setSheetH(r * innerHeight); });
 // The list refreshes in the background; don't let a refresh swap the row under a finger mid-tap.
 ['pointerdown', 'touchstart'].forEach(ev => $('#sheetBody').addEventListener(ev, () => { renderSheet.holdUntil = Date.now() + 700; }, { passive: true }));
 
@@ -744,7 +821,8 @@ async function start() {
   G = await deriveGroup(S.me.group);
   connect();
   applyWake();
-  const meta = S.netMeta || { bbox: RESORT.bbox, center: RESORT.center, label: 'Madonna di Campiglio' };
+  let meta = S.netMeta || { bbox: RESORT.bbox, center: RESORT.center, label: 'Madonna di Campiglio' };
+  if (meta.label === 'Madonna di Campiglio' && meta.bbox.join() !== RESORT.bbox.join()) meta = { ...meta, bbox: RESORT.bbox };   // area grew to Pinzolo + Folgarida
   if (!S.me.demo) startGps();
   tick(true);
   loadNet(meta.bbox, meta.center, meta.label);
