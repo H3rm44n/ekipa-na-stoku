@@ -147,4 +147,5 @@ null,null,"Ühendus","Seaded","SOS – häire seltskonnale","Vestlus","Seltskonn
 "Märkus","(valikuline)","nt lõuna, võtame laua terrassil","Saada seltskonnale",
 "Seltskonna vestlus","Tänased sõnumid, krüpteeritud grupikoodiga","Kirjuta seltskonnale…","Saada",
 "Suusakeskused","valitud","kaart telefonis · töötab võrguta","{mb} MB alla laadida","Vali","Kustuta kaart","Laadin keskuse {name} kaarti ({mb} MB)…","Kaarti ei õnnestunud alla laadida. Kontrolli ühendust.","Oled keskuses {name}","Vaheta","Kaart kustutatud: {name}",null,
+"{name} on teises suusakeskuses ({resort}) – sinna ei saa mööda radu.",
 ];

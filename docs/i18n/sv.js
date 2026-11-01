@@ -147,4 +147,5 @@ null,null,"Anslutning","Inställningar","SOS – larm till gänget","Chatt","Gä
 "Anteckning","(valfritt)","t.ex. lunch, vi tar ett bord på terrassen","Skicka till gänget",
 "Gängets chatt","Dagens meddelanden, krypterade med gruppkoden","Skriv till gänget…","Skicka",
 "Skidorter","vald","kartan i telefonen · fungerar offline","{mb} MB att ladda ner","Välj","Radera karta","Laddar ner kartan för {name} ({mb} MB)…","Kunde inte ladda ner kartan. Kontrollera anslutningen.","Du är i {name}","Byt","Karta raderad: {name}",null,
+"{name} är i en annan skidort ({resort}) – dit går det inte att åka i backarna.",
 ];

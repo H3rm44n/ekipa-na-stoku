@@ -147,4 +147,5 @@ null,null,"Conexiune","Setări","SOS – alarmă pentru gașcă","Chat","Chatul 
 "Notă","(opțional)","ex. prânz, luăm o masă pe terasă","Trimite găștii",
 "Chatul găștii","Mesajele de azi, criptate cu codul de grup","Scrie găștii…","Trimite",
 "Stațiuni","selectată","hartă în telefon · merge offline","{mb} MB de descărcat","Alege","Șterge harta","Descarc harta stațiunii {name} ({mb} MB)…","Harta stațiunii nu a putut fi descărcată. Verifică conexiunea.","Ești la {name}","Schimbă","Hartă ștearsă: {name}",null,
+"{name} e în altă stațiune ({resort}) – nu se poate ajunge pe pârtii.",
 ];

@@ -91,7 +91,9 @@ function updateFriendNav() {
   const dist = haversine([S.myPos[0], S.myPos[1]], [f.pos[0], f.pos[1]]);
   if (dist < 60) { navRoute = { here: true, dist, friend: f }; }
   else {
-    const plan = planMeet(S.net, { pos: S.myPos, track: S.myTrack }, S.preds.get(f.id));
+    const pr = S.preds.get(f.id);
+    if (pr?.elsewhere) { navRoute = { error: t('err.otherResort', { name: f.name, resort: shortName(pr.elsewhere) }) }; return; }
+    const plan = planMeet(S.net, { pos: S.myPos, track: S.myTrack }, pr);
     if (plan && !plan.error) navRoute = { ...plan, dist, friend: f };
     else { const r = routeToPoint(S.net, { pos: S.myPos, track: S.myTrack }, f.pos[0], f.pos[1]); navRoute = r ? { ...r, dist, friend: f, direct: true } : null; }
   }

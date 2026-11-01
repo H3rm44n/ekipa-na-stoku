@@ -490,55 +490,102 @@ document.addEventListener('visibilitychange', () => { applyWake(); if (document.
 
 /* ---------- demo bots ---------- */
 let demoTimer = null;
-// Bots near you plus a few in the other parts of the Skirama (Pinzolo, Folgarida-Marilleva).
-const BOT_NAMES = [['Ania', '#d6249f'], ['Marek', '#16a34a'], ['Zosia', '#7c3aed'], ['Tomek', '#eab308'],
-  ['Kasia', '#0891b2', [46.172, 10.778], 'Pinzolo'], ['Piotr', '#ea580c', [46.165, 10.762], 'Pinzolo'],
-  ['Ola', '#db2777', [46.300, 10.865], 'Folgarida'], ['Bartek', '#65a30d', [46.322, 10.812], 'Marilleva']];
-function startDemo() {
+// Demo crew spread over the resorts in the catalog. Each bot picks a goal (usually a lift station a few km away)
+// and travels there over the piste network – lifts, runs and short walks – so it crosses between connected
+// areas (Campiglio ↔ Pinzolo ↔ Folgarida-Marilleva, Tonale ↔ Ponte di Legno) like a real skier.
+const BOT_NAMES = [
+  ['Ania', '#d6249f', 'campiglio', [46.2298, 10.8268]], ['Marek', '#16a34a', 'campiglio'], ['Zosia', '#0f766e', 'campiglio'], ['Tomek', '#eab308', 'campiglio'],
+  ['Kasia', '#0891b2', 'campiglio', [46.172, 10.778]], ['Piotr', '#ea580c', 'campiglio', [46.165, 10.762]],
+  ['Ola', '#db2777', 'campiglio', [46.300, 10.865]], ['Bartek', '#65a30d', 'campiglio', [46.322, 10.812]],
+  ['Michał', '#e11d48', 'tonale'], ['Ewa', '#a16207', 'tonale', [46.255, 10.512]],
+  ['Jakub', '#0891b2', 'pejo'], ['Magda', '#16a34a', 'paganella'], ['Paweł', '#ff6b00', 'paganella', [46.177, 11.069]]];
+let demoGen = 0;
+async function startDemo() {
   stopDemo();
   if (!S.net) return;
+  const gen = ++demoGen;
   const R = S.resort;
   if (!S.myPos || (R && resortAt(S.myPos[0], S.myPos[1], 0) !== R)) setMyPos([R ? R.center[0] : 46.2298, R ? R.center[1] : 10.8268, null, 8, 0, null], true);
-  const liftsNear = ([lat, lon]) => {
-    const [cx, cy] = S.net.P(lat, lon);
-    return S.net.ways.filter(w => w.kind === 'lift' && w.len > 300).sort((a, b) => Math.hypot(a.pts[0].x - cx, a.pts[0].y - cy) - Math.hypot(b.pts[0].x - cx, b.pts[0].y - cy)).slice(0, 8);
-  };
-  const lifts = liftsNear(S.myPos);
-  if (!lifts.length) return;
-  const bots = BOT_NAMES.map(([name, color, anchor], i) => {
-    const near = anchor && resortAt(anchor[0], anchor[1], 0) === S.resort ? liftsNear(anchor) : lifts;
-    const w = near[i % Math.min(near.length, 3)] || lifts[i % lifts.length];
-    return { id: 'demo-' + i, name, color, w, along: (i * 0.23 % 0.8) * w.len, wait: 0, track: [], home: near.length ? near : lifts };
-  });
-  const step = () => {
-    const now = Date.now(), dt = 2;
-    for (const b of bots) {
-      if (b.wait > 0) b.wait -= dt;
-      else {
-        b.along += b.w.speed * (b.w.kind === 'lift' ? 1 : 1.2) * dt;
-        if (b.along >= b.w.len) {
-          const opts = S.net.continuations(b.w.pts[b.w.pts.length - 1], b.w.wi).filter(o => o.w.len > 120);
-          const o = opts.length ? opts[Math.floor(Math.random() * opts.length)] : null;
-          if (o) { b.w = o.w; b.along = o.w.cum[o.idx]; b.wait = o.w.kind === 'lift' ? 20 : 4; }
-          else { b.w = b.home[Math.floor(Math.random() * b.home.length)]; b.along = 0; b.wait = 10; }
-        }
-      }
-      const ll = alongLL(S.net, b.w, Math.min(b.along, b.w.len));
-      const last = b.track[b.track.length - 1];
-      if (!last || now - last[2] >= 4000) { b.track.push([ll[0], ll[1], now]); if (b.track.length > 20) b.track.shift(); }
-      b.st = b.st || { skiM: 2000 + Math.random() * 6000, liftM: 3000 + Math.random() * 5000, vertM: 800 + Math.random() * 1500, runs: 3 + (Math.random() * 6 | 0), maxV: 14 + Math.random() * 8 };
-      if (b.wait <= 0) { if (b.w.kind === 'lift') b.st.liftM += b.w.speed * dt; else { b.st.skiM += b.w.speed * 1.2 * dt; b.st.maxV = Math.max(b.st.maxV, b.w.speed * 1.2 + Math.random() * 6); } }
-      S.friends.set(b.id, { id: b.id, name: b.name, color: b.color, status: 'ride', t: now, pos: [ll[0], ll[1], null, 6, b.wait > 0 ? 0 : b.w.speed, null], track: b.track.slice(), act: 'ski', demo: true, st: b.st });
-    }
-    tick();
-  };
-  for (let i = 0; i < 12; i++) { // warm up so tracks have history
-    for (const b of bots) { b.along = Math.min(b.along + b.w.speed * 2, b.w.len - 1); const ll = alongLL(S.net, b.w, b.along); b.track.push([ll[0], ll[1], Date.now() - (12 - i) * 4000]); }
+  const bots = [];
+  for (const [i, [name, color, rid, anchor]] of BOT_NAMES.entries()) {
+    const net = await resortNet(rid);
+    if (!net || gen !== demoGen) continue;
+    const stations = net.ways.filter(w => w.kind === 'lift' && w.len > 250).map(w => w.pts[0]);
+    if (!stations.length) continue;
+    const [ax, ay] = anchor ? net.P(anchor[0], anchor[1]) : [stations[i % stations.length].x, stations[i % stations.length].y];
+    const start = stations.slice().sort((a, b) => Math.hypot(a.x - ax, a.y - ay) - Math.hypot(b.x - ax, b.y - ay))[0];
+    const b = { id: 'demo-' + i, name, color, net, stations, node: start, hops: [], prog: 0, wait: 5 + i * 3, track: [], ll: [start.lat, start.lon], spd: 0 };
+    botGoal(b);
+    bots.push(b);
   }
-  step();
-  demoTimer = setInterval(step, 2000);
+  if (gen !== demoGen) return;
+  const step = (dt, now) => {
+    for (const b of bots) {
+      botMove(b, dt);
+      const last = b.track[b.track.length - 1];
+      if (!last || now - last[2] >= 4000) { b.track.push([b.ll[0], b.ll[1], now]); if (b.track.length > 20) b.track.shift(); }
+      b.st = b.st || { skiM: 2000 + Math.random() * 6000, liftM: 3000 + Math.random() * 5000, vertM: 800 + Math.random() * 1500, runs: 3 + (Math.random() * 6 | 0), maxV: 14 + Math.random() * 8 };
+      if (b.spd > 0) { if (b.onLift) b.st.liftM += b.spd * dt; else { b.st.skiM += b.spd * dt; b.st.maxV = Math.max(b.st.maxV, b.spd + Math.random() * 6); } }
+      S.friends.set(b.id, { id: b.id, name: b.name, color: b.color, status: 'ride', t: now, pos: [b.ll[0], b.ll[1], null, 6, b.spd, null], track: b.track.slice(), act: 'ski', demo: true, st: b.st });
+    }
+  };
+  for (let k = 12; k > 0; k--) step(4, Date.now() - k * 4000);   // warm up so tracks have history
+  step(0, Date.now()); tick();
+  demoTimer = setInterval(() => { step(2, Date.now()); tick(); }, 2000);
 }
-function stopDemo() { if (demoTimer) clearInterval(demoTimer); demoTimer = null; for (const id of [...S.friends.keys()]) if (id.startsWith('demo-')) S.friends.delete(id); }
+// Route to a new goal: a lift station, more often a far one so bots move between areas.
+function botGoal(b) {
+  const { net } = b;
+  const { prev } = net.dijkstra([{ node: b.node, cost: 0 }], 3 * 3600);
+  const far = b.stations.filter(n => n !== b.node && prev.has(n.id) && Math.hypot(n.x - b.node.x, n.y - b.node.y) > 2500);
+  const any = b.stations.filter(n => n !== b.node && prev.has(n.id));
+  const pool = far.length && Math.random() < 0.6 ? far : any;
+  if (!pool.length) { b.hops = []; return; }
+  const goal = pool[Math.floor(Math.random() * pool.length)];
+  const hops = [];
+  for (let n = goal; n && n !== b.node;) { const p = prev.get(n.id); if (!p || !p.from) break; hops.push({ from: p.from, to: n, w: p.w, d: p.d }); n = p.from; }
+  b.hops = hops.reverse(); b.prog = 0; b.queued = false;
+}
+function botMove(b, dt) {
+  if (b.wait > 0) { b.wait -= dt; b.spd = 0; return; }
+  let left = dt;
+  while (left > 0) {
+    const h = b.hops[0];
+    if (!h) { b.wait = 20 + Math.random() * 60; b.spd = 0; botGoal(b); return; }   // at the goal: short break, then on
+    const w = h.w >= 0 ? b.net.ways[h.w] : null;
+    if (w?.kind === 'lift' && !b.queued) { b.queued = true; b.wait = 15 + Math.random() * 30; b.spd = 0; return; }   // lift queue
+    const speed = !w ? 1.3 : w.kind === 'lift' ? w.speed : w.speed * (1 + Math.random() * 0.4);
+    const len = Math.max(h.d, 1), step = Math.min(len - b.prog, speed * left);
+    b.prog += step; left -= step / speed; b.spd = speed; b.onLift = w?.kind === 'lift';
+    if (w) {
+      const i = w.pts.indexOf(h.from), j = w.pts.indexOf(h.to);
+      const a0 = w.cum[i] ?? 0, a1 = w.cum[j] ?? w.len;
+      b.ll = alongLL(b.net, w, a0 + (a1 - a0) * Math.min(1, b.prog / len));
+    } else {
+      const f = Math.min(1, b.prog / len);
+      b.ll = [h.from.lat + (h.to.lat - h.from.lat) * f, h.from.lon + (h.to.lon - h.from.lon) * f];
+    }
+    if (b.prog >= len - 0.01) { b.node = h.to; b.hops.shift(); b.prog = 0; b.queued = false; }
+  }
+}
+// Piste network of any resort in the catalog: the open one, or just its small data file for others.
+S.nets = new Map();
+async function resortNet(id) {
+  if (S.resort?.id === id) return S.net;
+  if (S.nets.has(id)) return S.nets.get(id);
+  const r = resortById(id); if (!r) return null;
+  try { const data = JSON.parse(await (await packFile(r, 'data')).text()); const net = new SkiNet(data.net, r.center); S.nets.set(id, net); return net; }
+  catch { return null; }
+}
+// Which network a friend is on (their resort may not be the one I have open).
+function netFor(f) {
+  const r = resortAt(f.pos[0], f.pos[1]);
+  if (!r || r === S.resort) return S.net;
+  if (!S.nets.has(r.id)) { S.nets.set(r.id, null); resortNet(r.id).then(n => { S.nets.set(r.id, n); }); }
+  return S.nets.get(r.id) || null;
+}
+const shortName = r => r.name.split(' · ')[0];
+function stopDemo() { demoGen++; if (demoTimer) clearInterval(demoTimer); demoTimer = null; for (const id of [...S.friends.keys()]) if (id.startsWith('demo-')) S.friends.delete(id); }
 
 /* ---------- render ---------- */
 function visibleFriends() { const now = Date.now(); return [...S.friends.values()].filter(f => now - f.t < MAX_AGE_SHOW); }
@@ -551,7 +598,11 @@ function tick(force) {
   if (document.hidden) return;   // nothing to draw in the background: save CPU
   const now = Date.now();
   const fr = visibleFriends();
-  for (const f of fr) S.preds.set(f.id, predict(S.net, f, now));
+  for (const f of fr) {
+    const p = predict(netFor(f), f, now), r = resortAt(f.pos[0], f.pos[1]);
+    if (r && S.resort && r !== S.resort) { p.elsewhere = r; p.text = `${shortName(r)} · ${p.text}`; }
+    S.preds.set(f.id, p);
+  }
   drawMarkers(fr);
   drawPredictions(fr);
   for (const h of HOOK.tick) try { h(force); } catch (err) { console.error(err); }
@@ -606,7 +657,8 @@ function computePlan() {
   const f = S.friends.get(S.selected);
   if (!f || !S.net || !S.myPos) { S.plan = null; return; }
   const me = { pos: S.myPos, track: S.myTrack };
-  S.plan = planMeet(S.net, me, S.preds.get(f.id));
+  const pr = S.preds.get(f.id);
+  S.plan = pr?.elsewhere ? { error: t('err.otherResort', { name: f.name, resort: shortName(pr.elsewhere) }) } : planMeet(S.net, me, pr);
   if (S.plan?.line) {
     routeLayer.addLayer(L.polyline(S.plan.line, { renderer, color: '#fff', weight: 10, opacity: 0.9, interactive: false }));
     routeLayer.addLayer(L.polyline(S.plan.line, { renderer, color: '#ff6b00', weight: 6, opacity: 1, interactive: false }));

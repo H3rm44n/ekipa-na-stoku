@@ -147,4 +147,5 @@ null,null,"Povezava","Nastavitve","SOS – alarm za ekipo","Klepet","Klepet ekip
 "Opomba","(neobvezna)","npr. kosilo, vzamemo mizo na terasi","Pošlji ekipi",
 "Klepet ekipe","Današnja sporočila, šifrirana s kodo skupine","Piši ekipi…","Pošlji",
 "Smučišča","izbrano","zemljevid v telefonu · deluje brez povezave","{mb} MB za prenos","Izberi","Izbriši zemljevid","Prenašam zemljevid smučišča {name} ({mb} MB)…","Zemljevida smučišča ni bilo mogoče prenesti. Preveri povezavo.","Si na smučišču {name}","Preklopi","Zemljevid izbrisan: {name}",null,
+"{name} je na drugem smučišču ({resort}) – po progah tja ne prideš.",
 ];

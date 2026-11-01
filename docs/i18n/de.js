@@ -147,4 +147,5 @@ null,null,"Verbindung","Einstellungen","SOS – Alarm für deine Gruppe","Chat",
 "Notiz","(optional)","z. B. Mittagessen, wir nehmen einen Tisch auf der Terrasse","An die Gruppe senden",
 "Gruppenchat","Nachrichten von heute, verschlüsselt mit dem Gruppencode","Schreib der Gruppe…","Senden",
 "Skigebiete","ausgewählt","Karte auf dem Handy · funktioniert offline","{mb} MB zum Herunterladen","Auswählen","Karte löschen","Lade die Karte von {name} ({mb} MB)…","Karte des Skigebiets konnte nicht geladen werden. Prüfe die Verbindung.","Du bist in {name}","Wechseln","Karte gelöscht: {name}",null,
+"{name} ist in einem anderen Skigebiet ({resort}) – dorthin gibt es keinen Weg über die Pisten.",
 ];

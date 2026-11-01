@@ -147,4 +147,5 @@ null,null,"Veza","Postavke","SOS – uzbuna za ekipu","Chat","Chat ekipe",
 "Bilješka","(neobavezno)","npr. ručak, uzimamo stol na terasi","Pošalji ekipi",
 "Chat ekipe","Današnje poruke, šifrirane kodom grupe","Piši ekipi…","Pošalji",
 "Skijališta","odabrano","karta na mobitelu · radi bez interneta","{mb} MB za preuzimanje","Odaberi","Izbriši kartu","Preuzimam kartu skijališta {name} ({mb} MB)…","Kartu skijališta nije moguće preuzeti. Provjeri vezu.","Na skijalištu si {name}","Promijeni","Karta izbrisana: {name}",null,
+"{name} je na drugom skijalištu ({resort}) – stazama se tamo ne može doći.",
 ];

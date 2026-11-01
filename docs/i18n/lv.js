@@ -147,4 +147,5 @@ null,null,"Savienojums","Iestatījumi","SOS – trauksme komandai","Tērzēšana
 "Piezīme","(nav obligāti)","piem. pusdienas, ņemam galdiņu uz terases","Sūtīt komandai",
 "Komandas tērzēšana","Šodienas ziņas, šifrētas ar grupas kodu","Raksti komandai…","Sūtīt",
 "Kūrorti","izvēlēts","karte tālrunī · darbojas bezsaistē","{mb} MB lejupielādei","Izvēlēties","Dzēst karti","Lejupielādēju kūrorta {name} karti ({mb} MB)…","Kūrorta karti neizdevās lejupielādēt. Pārbaudi savienojumu.","Tu esi kūrortā {name}","Pārslēgt","Karte izdzēsta: {name}",null,
+"{name} ir citā kūrortā ({resort}) – pa trasēm tur nevar nokļūt.",
 ];

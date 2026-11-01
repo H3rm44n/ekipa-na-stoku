@@ -147,4 +147,5 @@ null,null,"Ceangal","Socruithe","SOS – rabhadh do do chriú","Comhrá","Comhr�
 "Nóta","(roghnach)","m.sh. lón, tógfaimid bord ar an ardán","Seol chuig an gcriú",
 "Comhrá an chriú","Teachtaireachtaí an lae, criptithe le cód an ghrúpa","Scríobh chuig an gcriú…","Seol",
 "Ionaid sciála","roghnaithe","léarscáil ar do ghuthán · oibríonn as líne","{mb} MB le híoslódáil","Roghnaigh","Scrios an léarscáil","Ag íoslódáil léarscáil {name} ({mb} MB)…","Níorbh fhéidir an léarscáil a íoslódáil. Seiceáil do cheangal.","Tá tú ag {name}","Athraigh","Léarscáil scriosta: {name}",null,
+"Tá {name} ag ionad sciála eile ({resort}) – níl aon bhealach ann thar na fánaí.",
 ];

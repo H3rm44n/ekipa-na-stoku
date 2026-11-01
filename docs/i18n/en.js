@@ -460,4 +460,5 @@ I18N.en = {
   "rs.switchBtn": "Switch",
   "rs.deleted": "Map deleted: {name}",
   "se.licData": "Map: © <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors (ODbL), Protomaps tiles. Terrain: produced using Copernicus DEM GLO-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA. Runs, lifts and huts: © OpenStreetMap contributors (ODbL).<br>Software: Leaflet (BSD-2), MapLibre GL JS (BSD-3), PMTiles (BSD-3), Protomaps Basemaps (BSD-3), Leaflet-MapLibre (ISC), MQTT.js (MIT), Capacitor (MIT). Fonts: Barlow, Noto Sans (SIL OFL 1.1).<br>SOS only alerts your crew and does not replace the emergency number 112.",
+  "err.otherResort": "{name} is at another resort ({resort}) – there's no way there over the pistes.",
 };

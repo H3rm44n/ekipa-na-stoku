@@ -147,4 +147,5 @@ null,null,"Ryšys","Nustatymai","SOS – pavojus kompanijai","Pokalbis","Kompani
 "Pastaba","(neprivaloma)","pvz. pietūs, užimame stalą terasoje","Siųsti kompanijai",
 "Kompanijos pokalbis","Šiandienos žinutės, šifruotos grupės kodu","Rašyk kompanijai…","Siųsti",
 "Kurortai","pasirinktas","žemėlapis telefone · veikia be ryšio","{mb} MB atsisiųsti","Pasirinkti","Ištrinti žemėlapį","Atsisiunčiamas kurorto {name} žemėlapis ({mb} MB)…","Nepavyko atsisiųsti kurorto žemėlapio. Patikrink ryšį.","Esi kurorte {name}","Perjungti","Žemėlapis ištrintas: {name}",null,
+"{name} yra kitame kurorte ({resort}) – trasomis ten nenuvažiuosi.",
 ];

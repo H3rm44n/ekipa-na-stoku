@@ -459,4 +459,5 @@ I18N.pl = {
   "rs.switchBtn": "Przełącz",
   "rs.deleted": "Usunięto mapę: {name}",
   "se.licData": "Mapa: © współtwórcy <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> (ODbL), kafelki Protomaps. Rzeźba terenu: Copernicus DEM GLO-30 © DLR e.V. 2010-2014 i © Airbus Defence and Space GmbH 2014-2018, w ramach programu COPERNICUS UE i ESA. Trasy, wyciągi i schroniska: © współtwórcy OpenStreetMap (ODbL).<br>Oprogramowanie: Leaflet (BSD-2), MapLibre GL JS (BSD-3), PMTiles (BSD-3), Protomaps Basemaps (BSD-3), Leaflet-MapLibre (ISC), MQTT.js (MIT), Capacitor (MIT). Czcionki: Barlow, Noto Sans (SIL OFL 1.1).<br>SOS powiadamia tylko Twoją ekipę i nie zastępuje numeru alarmowego 112.",
+  "err.otherResort": "{name} jest w innym ośrodku ({resort}) – nie ma tam dojazdu po trasach.",
 };

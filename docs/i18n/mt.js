@@ -147,4 +147,5 @@ null,null,"Konnessjoni","Settings","SOS – allarm għall-grupp","Chat","Chat ta
 "Nota","(mhux obbligatorja)","eż. ikla, nieħdu mejda fuq it-terrazzin","Ibgħat lill-grupp",
 "Chat tal-grupp","Il-messaġġi tal-lum, ikkriptjati bil-kodiċi tal-grupp","Ikteb lill-grupp…","Ibgħat",
 "Resorts","magħżul","mappa fit-telefon · taħdem offline","{mb} MB biex tniżżel","Agħżel","Ħassar il-mappa","Qed inniżżel il-mappa ta' {name} ({mb} MB)…","Ma rnexxilix inniżżel il-mappa. Iċċekkja l-konnessjoni.","Int f'{name}","Aqleb","Mappa mħassra: {name}",null,
+"{name} qiegħed f'resort ieħor ({resort}) – m'hemmx triq hemm fuq il-pisti.",
 ];

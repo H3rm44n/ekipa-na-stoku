@@ -147,4 +147,5 @@ null,null,"Kapcsolat","Beállítások","SOS – riasztás a csapatnak","Chat","C
 "Megjegyzés","(nem kötelező)","pl. ebéd, foglalunk asztalt a teraszon","Küldés a csapatnak",
 "Csapatchat","Mai üzenetek, a csoportkóddal titkosítva","Írj a csapatnak…","Küldés",
 "Síterepek","kiválasztva","térkép a telefonon · offline is működik","{mb} MB letöltendő","Kiválasztás","Térkép törlése","{name} térképének letöltése ({mb} MB)…","A síterep térképét nem sikerült letölteni. Ellenőrizd a kapcsolatot.","Itt vagy: {name}","Váltás","Térkép törölve: {name}",null,
+"{name} egy másik síterepen van ({resort}) – a pályákon oda nem lehet eljutni.",
 ];

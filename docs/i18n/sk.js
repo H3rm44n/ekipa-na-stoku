@@ -147,4 +147,5 @@ null,null,"Pripojenie","Nastavenia","SOS – poplach pre partiu","Chat","Chat pa
 "Poznámka","(nepovinná)","napr. obed, berieme stôl na terase","Poslať partii",
 "Chat partie","Dnešné správy, šifrované kódom skupiny","Napíš partii…","Odoslať",
 "Strediská","vybrané","mapa v telefóne · funguje offline","{mb} MB na stiahnutie","Vybrať","Vymazať mapu","Sťahujem mapu strediska {name} ({mb} MB)…","Mapu strediska sa nepodarilo stiahnuť. Skontroluj pripojenie.","Si v stredisku {name}","Prepnúť","Mapa vymazaná: {name}",null,
+"{name} je v inom stredisku ({resort}) – po zjazdovkách sa tam nedostaneš.",
 ];

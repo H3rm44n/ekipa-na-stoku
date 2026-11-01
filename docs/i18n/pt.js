@@ -147,4 +147,5 @@ null,null,"Ligação","Definições","SOS – alarme para o teu grupo","Chat","C
 "Nota","(opcional)","ex. almoço, ficamos com uma mesa na esplanada","Enviar ao grupo",
 "Chat do grupo","Mensagens de hoje, cifradas com o código do grupo","Escreve ao grupo…","Enviar",
 "Estâncias","selecionada","mapa no telemóvel · funciona offline","{mb} MB para transferir","Escolher","Apagar mapa","A transferir o mapa de {name} ({mb} MB)…","Não foi possível transferir o mapa da estância. Verifica a ligação.","Estás em {name}","Mudar","Mapa apagado: {name}",null,
+"{name} está noutra estância ({resort}) – não há caminho pelas pistas.",
 ];
