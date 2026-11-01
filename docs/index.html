@@ -211,6 +211,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 .flag::before{content:"";position:absolute;left:0;top:0;width:3px;height:40px;background:#22313f;border-radius:2px}
 .flag span{position:absolute;left:3px;top:0;background:#7c3aed;color:#fff;font:700 12px/1 'Barlow Condensed',sans-serif;padding:4px 6px;border-radius:0 6px 6px 0;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35)}
 .ekpop .leaflet-popup-content{min-width:190px}
+.ekpop .btn:not(.primary){background:#fff;color:#0f2a44;border-color:#d7e2ec}
 .popact{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .picks{display:flex;flex-direction:column;gap:4px}
 .pick{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;width:100%}
@@ -288,6 +289,17 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
 .dayrow b{font:700 17px/1.1 var(--display)}
 .dayrow span{font-size:12px;color:var(--ink-2)}
 .dayrow .mx{font:700 16px/1 var(--display);text-align:right}
+/* destination picker */
+.seg{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{flex:1;height:32px;border:0;border-radius:8px;background:none;font-weight:600;font-size:13px;color:var(--ink-2)}
+.seg button.on{background:var(--ink);color:var(--snow)}
+.seg.small4 button{font-size:12px;padding:0 2px}
+.pickcard input[type=search]{height:38px}
+.pickcard .picks{max-height:300px;overflow-y:auto}
+.picon{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:#fff;font:700 14px/1 var(--display);background:#8a5a2b}
+.picon.lift,.picon.top{background:#7b2fbe}
+#btnNav.stop{background:var(--ink);border-color:var(--ink);color:var(--snow)}
+.card.gather{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 @media (prefers-reduced-motion:reduce){.fm .pulse{animation:none;display:none}}
 </style>
 </head>
@@ -365,13 +377,18 @@ table.rank{width:100%;border-collapse:collapse;font-size:13px;font-variant-numer
     <div class="box"><h3>Mapa tras</h3><p class="small" id="stNet">–</p>
       <div class="actions" style="margin-top:8px"><button class="btn" id="btnNetResort">Madonna di Campiglio</button><button class="btn" id="btnNetHere">Ośrodek w widoku mapy</button></div></div>
     <div class="actions"><button class="btn primary" id="btnSave">Zapisz</button><button class="btn" id="btnLeave" style="color:var(--bad)">Opuść grupę</button></div>
+    <details class="box"><summary style="font-weight:600;cursor:pointer">Licencje i źródła danych</summary><p class="note" style="margin-top:6px">
+      Dane tras, wyciągów i schronisk: © współtwórcy OpenStreetMap, licencja ODbL (openstreetmap.org/copyright).<br>
+      Mapa topograficzna: © OpenTopoMap (CC-BY-SA), dane SRTM. Mapa OSM: © współtwórcy OpenStreetMap. Zdjęcia satelitarne: Esri, Maxar, Earthstar Geographics.<br>
+      Oprogramowanie: Leaflet (BSD-2), MQTT.js (MIT), Capacitor (MIT), czcionki Barlow (SIL OFL 1.1).<br>
+      SOS powiadamia tylko Twoją ekipę i nie zastępuje numeru alarmowego 112.</p></details>
     <p class="note">Pozycje przesyłane są zaszyfrowane (AES‑GCM, klucz z kodu grupy) przez publiczne serwery MQTT HiveMQ i EMQX. Trasy i wyciągi: © OpenStreetMap. W aplikacji na iPhone GPS sam przechodzi w tryb oszczędny, gdy stoisz, jedziesz wyciągiem albo jesteś poza stokiem.</p>
   </div>
 </div>
 
 <div class="modal" id="meet" hidden>
   <form class="panel" id="meetForm">
-    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase">Spotkanie</b><span>Ekipa dostanie zaproszenie i trasę dojazdu</span></div><button type="button" class="close" data-close aria-label="Zamknij">×</button></div>
+    <div class="dhead"><div class="t"><b style="font:700 26px/1 var(--display);text-transform:uppercase" id="mfTitle">Spotkanie</b><span id="mfSub">Ekipa dostanie zaproszenie i trasę dojazdu</span></div><button type="button" class="close" data-close aria-label="Zamknij">×</button></div>
     <label for="mfPlace">Miejsce<input type="text" id="mfPlace" maxlength="60" placeholder="np. Rifugio Graffer"></label>
     <label for="mfTime">Godzina<input type="time" id="mfTime" step="300"></label>
     <div class="opts"><button type="button" class="btn sm" data-plus="15">za 15 min</button><button type="button" class="btn sm" data-plus="30">za 30 min</button><button type="button" class="btn sm" data-plus="60">za 1 h</button><button type="button" class="btn sm" data-plus="90">za 1,5 h</button></div>

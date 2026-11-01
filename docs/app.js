@@ -65,9 +65,9 @@ async function pubTopic(kind, id, obj, retain = true) {
 /* ---------- map ---------- */
 const map = L.map('map', { zoomControl: false, preferCanvas: true, tap: true }).setView(RESORT.center, 13);
 const baseLayers = [
-  ['Topo', L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 17, maxNativeZoom: 17, attribution: '© OpenStreetMap, SRTM · OpenTopoMap' })],
-  ['Satelita', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri World Imagery' })],
-  ['OSM', L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' })],
+  ['Topo', L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 17, maxNativeZoom: 17, attribution: '© współtwórcy <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, SRTM · © OpenTopoMap (CC-BY-SA)' })],
+  ['Satelita', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri, Maxar, Earthstar Geographics' })],
+  ['OSM', L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© współtwórcy <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' })],
 ];
 let baseIdx = LS.get('ek.base', 0) % baseLayers.length;
 baseLayers[baseIdx][1].addTo(map);

@@ -39,7 +39,7 @@ HOOK.topic.m = async (id, payload) => {
   S.meets.set(id, m);
   if (isNew && m.by !== S.me.id && !seenMeets.has(id)) {
     seenMeets.add(id); LS.set('ek.seenMeets', [...seenMeets].slice(-50));
-    notify(`${m.n} zaprasza na spotkanie`, `${m.place} o ${hhmm(m.at)}`, true);
+    notify(m.k === 'z' ? `${m.n} zwołuje zbiórkę` : `${m.n} zaprasza na spotkanie`, `${m.place} o ${hhmm(m.at)}`, true);
     S.sheetOpen = true;
   }
   tick(true);
@@ -51,15 +51,16 @@ HOOK.out.push(() => {
 });
 HOOK.friend.push((f, m) => { f.mr = m.mr && typeof m.mr === 'object' ? m.mr : {}; });
 
-async function createMeet(lat, lon, place, at, note) {
+// k: 'z' = zbiórka (gather the whole crew now), otherwise a planned meeting.
+async function createMeet(lat, lon, place, at, note, k) {
   const id = Math.random().toString(36).slice(2, 10);
-  const m = { id, by: S.me.id, n: displayName(S.me), lat: +lat.toFixed(6), lon: +lon.toFixed(6), place: place.slice(0, 60), at, note: (note || '').slice(0, 100), t: Date.now() };
+  const m = { id, by: S.me.id, n: displayName(S.me), lat: +lat.toFixed(6), lon: +lon.toFixed(6), place: place.slice(0, 60), at, note: (note || '').slice(0, 100), t: Date.now(), k: k === 'z' ? 'z' : undefined };
   S.meets.set(id, m);
   S.resp[id] = 'y'; LS.set('ek.resp', S.resp);
   await pubTopic('m', id, m, true);
   publish(true);
   startNav({ lat: m.lat, lon: m.lon, label: m.place, at, meetId: id });
-  toast('Wysłano zaproszenie do ekipy');
+  toast(k === 'z' ? 'Zwołano zbiórkę' : 'Wysłano zaproszenie do ekipy');
 }
 function answer(id, v) {
   S.resp[id] = v; LS.set('ek.resp', S.resp); publish(true);
@@ -135,7 +136,7 @@ function navCard() {
     body = `<div class="big">${fmtMin(r.myT)} · ${fmtDist(r.dist)}</div><div class="small">Będziesz ok. ${hhmm(arrive)}${when ? ' · ' + when : ''}</div><ol class="steps">${stepsHtml(r.steps)}</ol>`;
   }
   return `<div class="card nav"><div class="card-h"><b>Prowadzę do: ${esc(n.label)}</b><button class="close" data-act="navstop" aria-label="Zakończ prowadzenie">×</button></div>${body}
-    <div class="actions"><button class="btn sm" data-act="navfit">Pokaż na mapie</button></div></div>`;
+    <div class="actions"><button class="btn sm" data-act="navfit">Pokaż na mapie</button><button class="btn sm danger" data-act="navstop">Zakończ prowadzenie</button></div></div>`;
 }
 function friendNavCard(r, n) {
   const f = S.friends.get(n.friendId), name = esc(n.label);
@@ -154,17 +155,65 @@ function friendNavCard(r, n) {
     body = `<div class="big">${head}</div><div class="small">${sub}</div><ol class="steps">${stepsHtml(r.steps || [])}</ol>${late}`;
   }
   return `<div class="card nav"><div class="card-h"><span style="display:flex;align-items:center;gap:8px">${f ? `<span class="dotc" style="background:${f.color}"></span>` : ''}<b>Prowadzę do: ${name}</b></span><button class="close" data-act="navstop" aria-label="Zakończ prowadzenie">×</button></div>${body}
-    <div class="actions"><button class="btn sm" data-act="navfit">Pokaż na mapie</button><span class="small">Trasa odświeża się, gdy ${name} się przemieszcza.</span></div></div>`;
+    <div class="actions"><button class="btn sm" data-act="navfit">Pokaż na mapie</button><button class="btn sm danger" data-act="navstop">Zakończ prowadzenie</button></div><span class="small">Trasa odświeża się, gdy ${name} się przemieszcza.</span></div>`;
 }
 function startFriendNav(id) { const f = S.friends.get(id); if (f) startNav({ friendId: id, label: f.name, lat: f.pos[0], lon: f.pos[1] }); }
-let pickOpen = false;
+// "Dokąd jechać?": a person, a hut, a lift's bottom station or its top. In "zbiórka" mode the chosen
+// place becomes a gathering for the whole crew instead of guidance just for me.
+let pickOpen = false, pickTab = 'friend', pickMode = 'me', pickQ = '';
 HOOK.act.navpick = () => { pickOpen = !pickOpen; tick(true); };
-HOOK.act.navfriend = el => { pickOpen = false; startFriendNav(el.dataset.id); };
+HOOK.act.pickclose = () => { pickOpen = false; tick(true); };
+HOOK.act.picktab = el => { pickTab = el.dataset.t; pickQ = ''; tick(true); };
+HOOK.act.pickmode = el => { pickMode = el.dataset.m; tick(true); };
+HOOK.act.navfriend = el => {
+  pickOpen = false;
+  const f = S.friends.get(el.dataset.id);
+  if (pickMode === 'gather' && f) { pickMode = 'me'; openMeetForm(f.pos[0], f.pos[1], placeName(f.pos[0], f.pos[1]) || 'przy: ' + f.name, 'z'); return; }
+  startFriendNav(el.dataset.id);
+};
+HOOK.act.navto = el => {
+  pickOpen = false;
+  const lat = +el.dataset.lat, lon = +el.dataset.lon, name = el.dataset.name;
+  if (pickMode === 'gather') { pickMode = 'me'; openMeetForm(lat, lon, name, 'z'); return; }
+  startNav({ lat, lon, label: name });
+};
+function pickRef() { return S.myPos ? [S.myPos[0], S.myPos[1]] : [map.getCenter().lat, map.getCenter().lng]; }
+function pickPlaces() {
+  const ref = pickRef(), out = [];
+  if (pickTab === 'hut') for (const p of S.net?.pois || []) { if (p.kind === 'hut' || p.kind === 'food') out.push({ name: p.name, sub: POI_PL[p.kind], lat: p.lat, lon: p.lon }); }
+  else if (S.net) {
+    const seen = new Set();
+    for (const w of S.net.ways) {
+      if (w.kind !== 'lift' || w.len < 150) continue;
+      const n = pickTab === 'top' ? w.pts[w.pts.length - 1] : w.pts[0], name = wayLabel(w);
+      if (seen.has(name + pickTab)) continue; seen.add(name + pickTab);
+      out.push({ name: (pickTab === 'top' ? 'Góra: ' : 'Dół: ') + name, sub: liftKind(w) + ' · jazda ' + fmtMin(w.len / w.speed), lat: n.lat, lon: n.lon });
+    }
+  }
+  const q = pickQ.trim().toLowerCase();
+  return out.filter(p => !q || p.name.toLowerCase().includes(q)).map(p => ({ ...p, d: haversine(ref, [p.lat, p.lon]) })).sort((a, b) => a.d - b.d).slice(0, 30);
+}
+document.addEventListener('input', e => { if (e.target.id === 'pickQ') { pickQ = e.target.value; const box = $('#pickList'); if (box) box.innerHTML = pickListHtml(); } });
+function pickListHtml() {
+  if (pickTab === 'friend') {
+    const fr = visibleFriends().filter(f => f.id !== S.nav?.friendId).sort((a, b) => (distTo(a) ?? 1e9) - (distTo(b) ?? 1e9));
+    if (!fr.length) return '<p class="small">Nikogo jeszcze nie widać na mapie.</p>';
+    return fr.map(f => { const d = distTo(f); return `<button class="pick" data-act="navfriend" data-id="${esc(f.id)}"><span class="av sm" style="background:${f.color};color:${f.color}"><span style="color:#fff">${esc(initials(f.name))}</span></span><span class="pn"><b>${esc(f.name)}</b><span>${esc(S.preds.get(f.id)?.text || '')}</span></span><span class="pd">${d != null ? fmtDist(d) : ''}</span></button>`; }).join('');
+  }
+  const list = pickPlaces();
+  if (!list.length) return `<p class="small">${pickTab === 'hut' && !S.net?.pois ? 'Wczytuję schroniska…' : 'Nic nie znaleziono.'}</p>`;
+  const glyph = pickTab === 'hut' ? 'S' : pickTab === 'top' ? '▲' : '▼';
+  return list.map(p => `<button class="pick" data-act="navto" data-lat="${p.lat}" data-lon="${p.lon}" data-name="${esc(p.name)}"><span class="picon ${pickTab}">${glyph}</span><span class="pn"><b>${esc(p.name)}</b><span>${esc(p.sub)}</span></span><span class="pd">${fmtDist(p.d)}</span></button>`).join('');
+}
 function pickCard() {
   if (!pickOpen) return '';
-  const fr = visibleFriends().filter(f => f.id !== S.nav?.friendId).sort((a, b) => (distTo(a) ?? 1e9) - (distTo(b) ?? 1e9));
-  if (!fr.length) return '<div class="card"><p class="small">Nikogo jeszcze nie widać na mapie.</p></div>';
-  return `<div class="card"><div class="card-h"><b>Do kogo jechać?</b></div><div class="picks">${fr.map(f => { const d = distTo(f); return `<button class="pick" data-act="navfriend" data-id="${esc(f.id)}"><span class="av sm" style="background:${f.color};color:${f.color}"><span style="color:#fff">${esc(initials(f.name))}</span></span><span class="pn"><b>${esc(f.name)}</b><span>${esc(S.preds.get(f.id)?.text || '')}</span></span><span class="pd">${d != null ? fmtDist(d) : ''}</span></button>`; }).join('')}</div></div>`;
+  const tabs = [['friend', 'Osoba'], ['hut', 'Schronisko'], ['lift', 'Wyciąg'], ['top', 'Szczyt']];
+  return `<div class="card pickcard"><div class="card-h"><b>${pickMode === 'gather' ? 'Gdzie zbiórka?' : 'Dokąd jechać?'}</b><button class="close" data-act="pickclose" aria-label="Zamknij">×</button></div>
+    <div class="seg"><button data-act="pickmode" data-m="me" class="${pickMode === 'me' ? 'on' : ''}">Prowadź mnie</button><button data-act="pickmode" data-m="gather" class="${pickMode === 'gather' ? 'on' : ''}">Zbiórka ekipy</button></div>
+    <div class="seg small4">${tabs.map(([k, l]) => `<button data-act="picktab" data-t="${k}" class="${pickTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${pickTab !== 'friend' ? `<input type="search" id="pickQ" placeholder="Szukaj po nazwie" value="${esc(pickQ)}" autocomplete="off">` : ''}
+    ${pickMode === 'gather' ? '<p class="small">Wybierz miejsce – cała ekipa dostanie wezwanie i trasę dojazdu.</p>' : ''}
+    <div class="picks" id="pickList">${pickListHtml()}</div></div>`;
 }
 HOOK.act.navstop = stopNav;
 HOOK.act.navfit = fitNav;
@@ -172,19 +221,21 @@ HOOK.act.navfit = fitNav;
 function meetCards() {
   const now = Date.now();
   return [...S.meets.values()].filter(m => now < m.at + 45 * 60e3).sort((a, b) => a.at - b.at).map(m => {
-    const mine = m.by === S.me.id, my = S.resp[m.id];
+    const mine = m.by === S.me.id, my = S.resp[m.id], z = m.k === 'z';
     const people = visibleFriends().map(f => {
       const v = f.mr?.[m.id] || (f.id === m.by ? 'y' : null);
+      const here = f.pos && haversine([f.pos[0], f.pos[1]], [m.lat, m.lon]) < 80;
       let eta = '';
-      if (v === 'y' && S.net && f.pos) { const r = routeToPoint(S.net, { pos: f.pos, track: f.track }, m.lat, m.lon); if (r && !r.error) eta = r.here ? ' · na miejscu' : ` · ${fmtMin(r.myT)}`; }
-      return `<span class="who ${v === 'y' ? 'yes' : v === 'n' ? 'no' : ''}" style="--c:${f.color}">${esc(f.name)}${v === 'y' ? ' będzie' + eta : v === 'n' ? ' nie da rady' : ' ?'}</span>`;
+      if (here) eta = ' · na miejscu ✓';
+      else if (v === 'y' && S.net && f.pos) { const r = routeToPoint(S.net, { pos: f.pos, track: f.track }, m.lat, m.lon); if (r && !r.error) eta = r.here ? ' · na miejscu ✓' : ` · ${fmtMin(r.myT)}`; }
+      return `<span class="who ${v === 'y' || here ? 'yes' : v === 'n' ? 'no' : ''}" style="--c:${f.color}">${esc(f.name)}${here ? eta : v === 'y' ? (z ? ' jedzie' : ' będzie') + eta : v === 'n' ? ' nie da rady' : ' ?'}</span>`;
     }).join('');
     const mins = Math.round((m.at - now) / 60000);
-    return `<div class="card meet"><div class="card-h"><b>Spotkanie ${hhmm(m.at)}</b><span class="small">${mins > 0 ? `za ${fmtMin(mins * 60)}` : 'teraz'}</span></div>
-      <div class="big">${esc(m.place)}</div><div class="small">${mine ? 'Twoje zaproszenie' : 'od ' + esc(m.n)}${m.note ? ' · ' + esc(m.note) : ''}</div>
+    return `<div class="card meet${z ? ' gather' : ''}"><div class="card-h"><b>${z ? 'Zbiórka' : 'Spotkanie'} ${hhmm(m.at)}</b><span class="small">${mins > 0 ? `za ${fmtMin(mins * 60)}` : 'teraz'}</span></div>
+      <div class="big">${esc(m.place)}</div><div class="small">${mine ? (z ? 'Twoja zbiórka' : 'Twoje zaproszenie') : (z ? 'zwołuje ' : 'od ') + esc(m.n)}${m.note ? ' · ' + esc(m.note) : ''}</div>
       <div class="whos">${people || '<span class="small">Czekam na odpowiedzi ekipy</span>'}</div>
       <div class="actions">
-        ${mine ? '' : `<button class="btn sm ${my === 'y' ? 'primary' : ''}" data-act="ans" data-id="${m.id}" data-v="y">Będę</button><button class="btn sm ${my === 'n' ? 'dark' : ''}" data-act="ans" data-id="${m.id}" data-v="n">Nie dam rady</button>`}
+        ${mine ? '' : `<button class="btn sm ${my === 'y' ? 'primary' : ''}" data-act="ans" data-id="${m.id}" data-v="y">${z ? 'Jadę' : 'Będę'}</button><button class="btn sm ${my === 'n' ? 'dark' : ''}" data-act="ans" data-id="${m.id}" data-v="n">Nie dam rady</button>`}
         <button class="btn sm" data-act="meetnav" data-id="${m.id}">Prowadź</button>
         ${mine || isAdmin() ? `<button class="btn sm danger" data-act="meetcancel" data-id="${m.id}">Odwołaj</button>` : ''}
       </div></div>`;
@@ -208,11 +259,13 @@ function drawMeets() {
 }
 
 /* Meeting form */
-function openMeetForm(lat, lon, place) {
-  const f = $('#meetForm');
+function openMeetForm(lat, lon, place, kind) {
+  const f = $('#meetForm'), z = kind === 'z';
   $('#mfPlace').value = place || '';
   $('#mfNote').value = '';
-  let at = Date.now() + 30 * 60e3;
+  $('#mfTitle').textContent = z ? 'Zbiórka' : 'Spotkanie';
+  $('#mfSub').textContent = z ? 'Cała ekipa dostanie wezwanie i trasę dojazdu' : 'Ekipa dostanie zaproszenie i trasę dojazdu';
+  let at = Date.now() + (z ? 15 : 30) * 60e3;
   const setAt = t => { at = t; const d = new Date(t); $('#mfTime').value = `${String(d.getHours()).padStart(2, '0')}:${String(Math.round(d.getMinutes() / 5) * 5 % 60).padStart(2, '0')}`; };
   setAt(at);
   f.querySelectorAll('[data-plus]').forEach(b => { b.onclick = () => setAt(Date.now() + +b.dataset.plus * 60e3); });
@@ -222,7 +275,7 @@ function openMeetForm(lat, lon, place) {
     e.preventDefault();
     const place = $('#mfPlace').value.trim() || 'Punkt na mapie';
     $('#meet').hidden = true;
-    createMeet(lat, lon, place, at, $('#mfNote').value.trim());
+    createMeet(lat, lon, place, at, $('#mfNote').value.trim(), kind);
   };
 }
 $('#meet').addEventListener('click', e => { if (e.target.id === 'meet' || e.target.closest('[data-close]')) $('#meet').hidden = true; });
@@ -239,7 +292,7 @@ function placeName(lat, lon) {
 
 /* ---------- map: long-press menu + huts ---------- */
 const popActions = (lat, lon, name) => `<div class="popact" data-lat="${lat}" data-lon="${lon}" data-name="${esc(name)}">
-  <button class="btn sm primary" data-pop="meet">Spotkanie tutaj</button><button class="btn sm" data-pop="nav">Prowadź tutaj</button>
+  <button class="btn sm primary" data-pop="nav">Prowadź tutaj</button><button class="btn sm" data-pop="gather">Zbiórka tutaj</button><button class="btn sm" data-pop="meet">Spotkanie</button>
   ${S.me?.demo ? '<button class="btn sm" data-pop="here">Tu jestem (demo)</button>' : ''}</div>`;
 HOOK.longpress = ll => {
   const name = placeName(ll.lat, ll.lng);
@@ -250,6 +303,7 @@ document.addEventListener('click', e => {
   const box = b.closest('.popact'), lat = +box.dataset.lat, lon = +box.dataset.lon, name = box.dataset.name;
   map.closePopup();
   if (b.dataset.pop === 'meet') openMeetForm(lat, lon, name);
+  else if (b.dataset.pop === 'gather') openMeetForm(lat, lon, name, 'z');
   else if (b.dataset.pop === 'nav') startNav({ lat, lon, label: name || 'punkt na mapie' });
   else if (b.dataset.pop === 'here') { setMyPos([lat, lon, null, 5, 0, null], true); toast('Ustawiono Twoją pozycję (demo)'); }
 });
@@ -309,12 +363,31 @@ $('#btnSos').onclick = () => {
 };
 HOOK.tick.push(() => $('#btnSos').classList.toggle('on', !!S.sos || visibleFriends().some(f => f.sos)));
 // "Prowadź" under SOS: the list of people to guide to, at the top of the sheet.
+// While guiding it turns into "Zakończ"; a second tap on an open picker closes it.
 $('#btnNav').onclick = () => {
   if (!S.me) return;
+  if (S.nav) { stopNav(); toast('Prowadzenie zakończone'); return; }
+  if (pickOpen && !S.view && !S.selected) { pickOpen = false; tick(true); return; }
   S.selected = null; S.view = null; S.tab = 'crew'; S.sheetOpen = true; pickOpen = true;
   tick(true);
   const l = $('#sheetBody .list'); if (l) l.scrollTop = 0;
 };
+HOOK.tick.push(() => {
+  const b = $('#btnNav'), on = !!S.nav;
+  b.classList.toggle('stop', on);
+  b.lastChild.textContent = on ? 'Zakończ' : 'Prowadź';
+  b.setAttribute('aria-label', on ? 'Zakończ prowadzenie' : 'Prowadź do…');
+});
+// Escape / back closes whatever is on top: a window, the status menu, the picker, a detail view.
+function closeTop() {
+  for (const id of ['#meet', '#chat', '#group', '#settings']) { const el = $(id); if (el && !el.hidden && !(id === '#settings' && !S.me)) { if (id === '#chat') closeChat(); else el.hidden = true; return true; } }
+  if (!$('#stMenu').hidden) { $('#stMenu').hidden = true; renderStatusBtn(); return true; }
+  if (map._popup && map.hasLayer(map._popup)) { map.closePopup(); return true; }
+  if (pickOpen) { pickOpen = false; tick(true); return true; }
+  if (S.view || S.selected) { deselect(); return true; }
+  return false;
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && closeTop()) e.preventDefault(); });
 HOOK.act.sosyes = () => setSos(true);
 HOOK.act.sosno = () => { sosConfirm = false; tick(true); };
 HOOK.act.sosoff = () => setSos(false);
@@ -359,7 +432,15 @@ HOOK.friend.push(f => {
 HOOK.top.unshift(() => {
   const hidden = (S.me?.hideUntil || 0) > Date.now();
   const bar = hidden ? `<div class="actbar"><span class="small">Jesteś ukryty na mapie znajomych</span><span class="grow"></span><button class="btn sm" data-act="unhide">Pokaż mnie</button></div>` : '';
-  return sosCards() + navCard() + meetCards() + bar + chatPreview() + pickCard();
+  return sosCards() + pickCard() + navCard() + meetCards() + bar + chatPreview();
 });
 
 HOOK.netReady.push(askNotifications);
+
+// Popups (long-press, huts) slide the map so they stay above the sheet and below the top bar.
+map.on('popupopen', e => {
+  const p = e.popup;
+  p.options.autoPanPaddingTopLeft = L.point(20, 110);
+  p.options.autoPanPaddingBottomRight = L.point(70, sheetH() + 20);
+  if (p._adjustPan) p._adjustPan();
+});
