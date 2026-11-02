@@ -76,7 +76,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) saveT
 async function exportGpx(track = dayTrack) {
   if (track.pts.length < 2) { toast(t('t.noTrack')); return; }
   const pts = track.pts.map(p => `<trkpt lat="${p[0]}" lon="${p[1]}">${p[2] != null ? `<ele>${p[2]}</ele>` : ''}<time>${new Date(p[3]).toISOString()}</time></trkpt>`).join('');
-  const gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Ekipa na Stoku" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Narty ${track.date}</name><trkseg>${pts}</trkseg></trk></gpx>`;
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="PisteMates" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Narty ${track.date}</name><trkseg>${pts}</trkseg></trk></gpx>`;
   const name = `narty-${track.date}.gpx`;
   const file = new File([gpx], name, { type: 'application/gpx+xml' });
   try { if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; } } catch (e) { if (e?.name === 'AbortError') return; }

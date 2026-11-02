@@ -1,6 +1,6 @@
 {
   "appId": "pl.hermanski.ekipanastoku",
-  "appName": "Ekipa",
+  "appName": "PisteMates",
   "webDir": "docs",
   "ios": {
     "contentInset": "never",

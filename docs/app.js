@@ -1,5 +1,5 @@
 'use strict';
-/* Ekipa na Stoku – app shell: map, GPS, encrypted sharing over MQTT, crew list, meeting planner. */
+/* PisteMates (formerly "Ekipa") – app shell: map, GPS, encrypted sharing over MQTT, crew list, meeting planner. */
 
 const $ = s => document.querySelector(s);
 const LS = {

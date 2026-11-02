@@ -36,7 +36,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>CFBundleDisplayName</key>
-	<string>Ekipa</string>
+	<string>PisteMates</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -56,7 +56,7 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Allow “Always” so friends can see you even with the phone locked in your pocket.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Ekipa shows the friends in your group where you are on the slopes.</string>
+	<string>PisteMates shows the friends in your group where you are on the slopes.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
