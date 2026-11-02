@@ -6,3 +6,4 @@ ios/App/build/
 ios/DerivedData/
 .DS_Store
 ios/build/
+docs/config.js

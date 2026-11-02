@@ -1,0 +1,3 @@
+# The app account may only use the app's own topic tree.
+user pistemates-app
+topic readwrite ekipa-narty/v1/#

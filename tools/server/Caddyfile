@@ -1,0 +1,15 @@
+# PisteMates: app files, resort packs and legal pages on the main domain; the message server behind /mqtt.
+pistemates.com, www.pistemates.com, mqtt.pistemates.com {
+	encode zstd gzip
+	@mqtt path /mqtt
+	handle @mqtt {
+		reverse_proxy 127.0.0.1:9001
+	}
+	handle {
+		root * /var/www/pistemates
+		header /packs/* Cache-Control "public, max-age=86400"
+		header /packs/catalog.json Cache-Control "no-cache"
+		header Access-Control-Allow-Origin "*"
+		file_server
+	}
+}

@@ -10,8 +10,10 @@ const LS = {
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const RESORT = { name: 'Madonna di Campiglio · Pinzolo · Folgarida-Marilleva', center: [46.2297, 10.8263], bbox: [46.13, 10.68, 46.36, 10.97] };
-// Message servers. For the App Store build put a private broker first (url + username/password).
-const BROKERS = [{ url: 'wss://broker.hivemq.com:8884/mqtt' }, { url: 'wss://broker.emqx.io:8084/mqtt' }];
+// Message servers and web address come from config.js (kept out of git, holds the server password);
+// without it the app uses the public test brokers.
+const CONFIG = typeof SERVER !== 'undefined' ? SERVER : {};
+const BROKERS = CONFIG.brokers?.length ? CONFIG.brokers : [{ url: 'wss://broker.hivemq.com:8884/mqtt' }, { url: 'wss://broker.emqx.io:8084/mqtt' }];
 const COLORS = ['#ff6b00', '#d6249f', '#16a34a', '#0f766e', '#eab308', '#0891b2', '#a16207', '#e11d48'];
 const OLD_COLORS = ['#7c3aed'];   // still accepted from friends on older versions
 // Lifts get their own colour so they never look like a black piste.
@@ -903,7 +905,7 @@ function renderBattery() {
 }
 $('#btnSettings').onclick = openSettings;
 $('#settings').addEventListener('click', e => { if (e.target.id === 'settings' || e.target.closest('[data-close]')) $('#settings').hidden = true; });
-const WEB_URL = 'https://h3rm44n.github.io/ekipa-na-stoku/';
+const WEB_URL = CONFIG.web || 'https://h3rm44n.github.io/ekipa-na-stoku/';
 $('#btnLeave').onclick = () => {
   const b = $('#btnLeave');
   if (!b.dataset.confirm) { b.dataset.confirm = '1'; b.textContent = t('leave.confirm'); setTimeout(() => { delete b.dataset.confirm; b.textContent = t('leave'); }, 4000); return; }
